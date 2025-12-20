@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpecGen - Gerador de Especificações Técnicas para Licitações</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #1c2128;
+            --bg-card: #1c2128;
+            --accent-primary: #00d4ff;
+            --accent-secondary: #0099cc;
+            --accent-hover: #00b8e6;
+            --text-primary: #ffffff;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --border-color: #30363d;
+            --success: #3fb950;
+            --warning: #d29922;
+            --error: #f85149;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.6; }
+        header { background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 1rem 2rem; position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1600px; margin: 0 auto; display: flex; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+        .logo-text { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+        .logo-subtitle { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.15em; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 1.5rem 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 1200px) { .container { grid-template-columns: 1fr; } }
+        .panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+        .panel-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-secondary); }
+        .panel-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
+        .panel-body { flex: 1; padding: 1.25rem; overflow-y: auto; }
+        .input-section { margin-bottom: 1.25rem; }
+        .input-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .input-help { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem; }
+        .file-upload-area { border: 1px dashed var(--border-color); border-radius: 6px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s ease; background: var(--bg-secondary); }
+        .file-upload-area:hover, .file-upload-area.dragover { border-color: var(--accent-primary); background: rgba(0, 212, 255, 0.05); }
+        .file-upload-area.has-file { border-color: var(--success); background: rgba(63, 185, 80, 0.05); }
+        .upload-text { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .upload-formats { font-size: 0.7rem; color: var(--text-muted); }
+        .file-info { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem; background: var(--bg-tertiary); border-radius: 6px; margin-top: 0.75rem; }
+        .file-info-name { flex: 1; font-size: 0.8rem; color: var(--success); }
+        .file-info-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+        .file-info-remove:hover { color: var(--error); background: rgba(248, 81, 73, 0.1); }
+        .datasheet-textarea { width: 100%; min-height: 180px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-primary); resize: vertical; }
+        .datasheet-textarea:focus { outline: none; border-color: var(--accent-primary); }
+        .datasheet-textarea::placeholder { color: var(--text-muted); }
+        .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        .category-btn { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.6rem 0.5rem; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; transition: all 0.2s ease; text-align: center; font-family: 'Inter', sans-serif; }
+        .category-btn:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+        .category-btn.selected { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--bg-primary); font-weight: 500; }
+        .generate-btn { width: 100%; padding: 0.85rem; background: var(--accent-primary); border: none; border-radius: 6px; color: var(--bg-primary); font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-top: 1.25rem; }
+        .generate-btn:hover:not(:disabled) { background: var(--accent-hover); }
+        .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 0.5rem; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .output-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 350px; text-align: center; color: var(--text-muted); }
+        .output-empty p { font-size: 0.85rem; }
+        .output-content { display: none; }
+        .output-content.visible { display: block; }
+        .spec-section { margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); }
+        .spec-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .spec-section-title { font-size: 0.85rem; font-weight: 600; color: var(--accent-primary); margin-bottom: 0.6rem; }
+        .spec-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .spec-table th, .spec-table td { padding: 0.55rem 0.7rem; text-align: left; border: 1px solid var(--border-color); }
+        .spec-table th { background: var(--bg-secondary); color: var(--text-secondary); font-weight: 500; width: 40%; }
+        .spec-table td { background: var(--bg-tertiary); color: var(--text-primary); }
+        .spec-notes { background: var(--bg-secondary); border-left: 3px solid var(--warning); padding: 0.85rem; border-radius: 0 6px 6px 0; margin-top: 1rem; }
+        .spec-notes-title { font-size: 0.75rem; font-weight: 600; color: var(--warning); margin-bottom: 0.35rem; }
+        .spec-notes-text { font-size: 0.75rem; color: var(--text-secondary); }
+        .output-actions { display: flex; gap: 0.6rem; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
+        .action-btn { flex: 1; min-width: 100px; padding: 0.65rem 0.75rem; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 500; cursor: pointer; text-align: center; }
+        .action-btn-primary { background: var(--accent-primary); border: none; color: var(--bg-primary); }
+        .action-btn-primary:hover { background: var(--accent-hover); }
+        .action-btn-secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .action-btn-secondary:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .tips-section { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem; margin-top: 1.25rem; }
+        .tips-title { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.4rem; }
+        .tips-list { font-size: 0.7rem; color: var(--text-muted); list-style: none; }
+        .tips-list li { padding: 0.2rem 0; padding-left: 0.85rem; position: relative; }
+        .tips-list li::before { content: '•'; position: absolute; left: 0; color: var(--text-primary); }
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem 1.25rem; transform: translateY(100px); opacity: 0; transition: all 0.3s ease; z-index: 1000; }
+        .toast.visible { transform: translateY(0); opacity: 1; }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--error); }
+        .toast-message { font-size: 0.85rem; color: var(--text-primary); }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
+        .modal-overlay.visible { display: flex; }
+        .modal { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 100%; max-width: 800px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+        .modal-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+        .modal-title { font-size: 1rem; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.35rem 0.6rem; border-radius: 4px; font-size: 1.1rem; }
+        .modal-close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
+        .modal-body pre { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABQAFADASIAAhEBAxEB/8QAHAABAQACAwEBAAAAAAAAAAAAAAEFBwIGCAQD/8QALhAAAQQCAQIEBAYDAAAAAAAAAQACAwQFEQYSIQcTMUEiUWGRCBQiUnGhFWKB/8QAGQEBAAMBAQAAAAAAAAAAAAAAAAECBQME/8QAIxEAAgICAQMFAQAAAAAAAAAAAAECAxExBBJBURMVIjJxwf/aAAwDAQACEQMRAD8A9VKKqISFVFUBFVEQFUREA7IgT3QFUVRAFFV1nxJ5SziXGJciGNltSPENWN3o6QgnZ+gAJP8AGvdTGLk8IrZZGuLlLSOw2LFetH5lmxFCw+jpXho+5StYr2WGStPDOwero3hw+4Xn3G4HJcmoO5bzDkcONoSv6YrFv9TpT8o2dgG9jrXy7D3X2X8Tj+L4KLkfGubR2rX5gMY2ABnWPcFuye3uHDWknGUXoyvcrPv6fx3tZx5wb6Ta674dcmZynjjL7mNjtRu8qyxvoHgb2PoRoj/o9l2LSg1K7I2QU46YHog9UTSFyoiiAq03+KJk4xODmbvyW2JmOPsHlg6f6DluRYfmXHaPKOO2cNkA4RzAFkjfiiePhePqD9xse678axV2qUtHDlUu6mUF3NI5PLwZitxvLP4tlcjxjEUBUnZoxxusdOnFpbvsCAN+hWdo0uGZDhmazruESYavVrO8ixPYcTLKQQ0MG++jrv6bOvmsKYfF/wAPqYw2KgF3GRSufDPXpiw0hx2R+5oJ79JHY+6+f/FeKfiHbhjzUdmtTY7YdYh/LQR/7Bnq933P1C0LKItZUl0/v88mK4NN5i3J9ulbxje8I7f+Gtk5x+bmdvyXSwsB9i8NcT/RC24sPw/j9LjOAr4ij1OZHtz5HD9Urz8Tz/Py9hoLMLLm05PGjY4VLoojW9oIiKh6QiKICrQOW8ZOYw8kz+Co47E2blPLw0qkNao607ynzyRhzuiwOqTTAfLIjIJPqAt/Lj0M7npb39e3qgPPlvxp5vQu5ullsdx/FX8XiqtiSrYY4ubNIyuZCdT9XQwzPJAYRpmi8FfryHxszuIzlihDc4xmGx4p1qvNRrSubdkFaebrYTPtkIMQYSA/vsbGwt/dDN7LW71revZOhn7W9hr09kGDz3B46coZDiHnDYzJR5CCEy2qbD5dWWS+K7WvDZpB0lgd3DiQ8s3rfSvQ7wGyOaPQOIH3XAMaBoNA/gKoEVFECAJpVECIiIgCKogCiKoAoqogP//Z" alt="SpecGen Logo" class="logo-img">
+                <div>
+                    <div class="logo-text">SpecGen</div>
+                    <div class="logo-subtitle">Gerador de Especificações Técnicas</div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main class="container">
+        <div class="panel">
+            <div class="panel-header"><div class="panel-title">Dados do Equipamento</div></div>
+            <div class="panel-body">
+                <div class="input-section">
+                    <label class="input-label">Upload do Datasheet (PDF)</label>
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <input type="file" id="fileInput" accept=".pdf,.txt" hidden>
+                        <div class="upload-text">Arraste o arquivo ou clique para selecionar</div>
+                        <div class="upload-formats">PDF, TXT (máx. 10MB)</div>
+                    </div>
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <span class="file-info-name" id="fileName"></span>
+                        <button class="file-info-remove" id="fileRemove">Remover</button>
+                    </div>
+                </div>
+                <div class="input-section">
+                    <label class="input-label">Ou cole o conteúdo do Datasheet</label>
+                    <textarea class="datasheet-textarea" id="datasheetText" placeholder="Cole aqui as especificações técnicas do datasheet..."></textarea>
+                    <div class="input-help">Copie e cole as especificações diretamente do PDF ou site do fabricante</div>
+                </div>
+                <div class="input-section">
+                    <label class="input-label">Categoria do Equipamento</label>
+                    <div class="category-grid">
+                        <button class="category-btn selected" data-category="switch">Switch</button>
+                        <button class="category-btn" data-category="router">Roteador</button>
+                        <button class="category-btn" data-category="firewall">Firewall</button>
+                        <button class="category-btn" data-category="access-point">Access Point</button>
+                        <button class="category-btn" data-category="server">Servidor</button>
+                        <button class="category-btn" data-category="storage">Storage</button>
+                        <button class="category-btn" data-category="ups">Nobreak/UPS</button>
+                        <button class="category-btn" data-category="camera">Câmera IP</button>
+                        <button class="category-btn" data-category="other">Outro</button>
+                    </div>
+                </div>
+                <button class="generate-btn" id="generateBtn">Gerar Especificação Técnica</button>
+                <div class="tips-section">
+                    <div class="tips-title">Dicas para Licitações</div>
+                    <ul class="tips-list">
+                        <li>Use faixas de valores (ex: "mínimo 48 portas") em vez de valores exatos</li>
+                        <li>Especifique padrões (IEEE, RFC) em vez de tecnologias proprietárias</li>
+                        <li>Evite mencionar marcas, modelos ou termos exclusivos do fabricante</li>
+                        <li>Inclua requisitos de garantia e suporte técnico</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">Especificação Gerada</div>
+                <span id="outputStatus" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+            </div>
+            <div class="panel-body">
+                <div class="output-empty" id="outputEmpty">
+                    <p>Nenhuma especificação gerada ainda</p>
+                    <p style="font-size:0.75rem;margin-top:0.35rem;">Insira os dados do datasheet e clique em "Gerar"</p>
+                </div>
+                <div class="output-content" id="outputContent">
+                    <div id="specificationOutput"></div>
+                    <div class="output-actions">
+                        <button class="action-btn action-btn-primary" id="copyBtn">Copiar</button>
+                        <button class="action-btn action-btn-primary" id="exportWordBtn">Exportar Word</button>
+                        <button class="action-btn action-btn-secondary" id="viewRawBtn">Ver Texto</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <div class="toast" id="toast"><span class="toast-message" id="toastMessage"></span></div>
+    <div class="modal-overlay" id="rawModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Especificação em Texto Plano</div>
+                <button class="modal-close" id="modalClose">✕</button>
+            </div>
+            <div class="modal-body"><pre id="rawText"></pre></div>
+        </div>
+    </div>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        let selectedCategory = 'switch';
+        let generatedSpec = null;
+        const fileUploadArea = document.getElementById('fileUploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileRemove = document.getElementById('fileRemove');
+        const datasheetText = document.getElementById('datasheetText');
+        const categoryBtns = document.querySelectorAll('.category-btn');
+        const generateBtn = document.getElementById('generateBtn');
+        const outputEmpty = document.getElementById('outputEmpty');
+        const outputContent = document.getElementById('outputContent');
+        const specificationOutput = document.getElementById('specificationOutput');
+        const outputStatus = document.getElementById('outputStatus');
+        const copyBtn = document.getElementById('copyBtn');
+        const exportWordBtn = document.getElementById('exportWordBtn');
+        const viewRawBtn = document.getElementById('viewRawBtn');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toastMessage');
+        const rawModal = document.getElementById('rawModal');
+        const rawText = document.getElementById('rawText');
+        const modalClose = document.getElementById('modalClose');
+
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                categoryBtns.forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedCategory = btn.dataset.category;
+            });
+        });
+
+        fileUploadArea.addEventListener('click', () => fileInput.click());
+        fileUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); fileUploadArea.classList.add('dragover'); });
+        fileUploadArea.addEventListener('dragleave', () => { fileUploadArea.classList.remove('dragover'); });
+        fileUploadArea.addEventListener('drop', (e) => { e.preventDefault(); fileUploadArea.classList.remove('dragover'); if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+        fileRemove.addEventListener('click', (e) => { e.stopPropagation(); fileInput.value = ''; fileInfo.style.display = 'none'; fileUploadArea.classList.remove('has-file'); });
+
+        async function handleFile(file) {
+            if (file.size > 10 * 1024 * 1024) { showToast('Arquivo muito grande. Máximo 10MB.', 'error'); return; }
+            fileName.textContent = file.name; fileInfo.style.display = 'flex'; fileUploadArea.classList.add('has-file');
+            if (file.type === 'application/pdf') {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    let text = '';
+                    for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        text += content.items.map(item => item.str).join(' ') + '\n';
+                    }
+                    if (text.trim()) { datasheetText.value = text.trim(); showToast('Texto extraído do PDF!', 'success'); }
+                } catch (error) { showToast('Erro ao extrair texto do PDF.', 'error'); }
+            } else if (file.type === 'text/plain') { datasheetText.value = await file.text(); showToast('Arquivo carregado!', 'success'); }
+        }
+
+        generateBtn.addEventListener('click', () => {
+            const text = datasheetText.value.trim();
+            if (!text) { showToast('Insira o conteúdo do datasheet.', 'error'); return; }
+            generateBtn.innerHTML = '<span class="spinner"></span>Processando...';
+            generateBtn.disabled = true;
+            setTimeout(() => {
+                generatedSpec = generateSpecification(text, selectedCategory);
+                specificationOutput.innerHTML = generatedSpec.html;
+                outputEmpty.style.display = 'none';
+                outputContent.classList.add('visible');
+                outputStatus.textContent = 'Gerado em ' + new Date().toLocaleTimeString('pt-BR');
+                generateBtn.innerHTML = 'Gerar Especificação Técnica';
+                generateBtn.disabled = false;
+                showToast('Especificação gerada!', 'success');
+            }, 1000);
+        });
+
+        copyBtn.addEventListener('click', () => { if (generatedSpec) { navigator.clipboard.writeText(generatedSpec.plainText).then(() => { showToast('Texto copiado!', 'success'); }); } });
+        
+        exportWordBtn.addEventListener('click', () => { if (generatedSpec) exportToWord(); });
+        
+        function exportToWord() {
+            const title = getCategoryTitle(selectedCategory);
+            const portInfo = analyzePortsFromRaw(datasheetText.value);
+            const perfInfo = analyzePerformanceFromRaw(datasheetText.value);
+            let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>body{font-family:Arial;font-size:11pt}h1{font-size:14pt;text-align:center}h2{font-size:12pt;border-bottom:1px solid #333;margin-top:14pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:6pt}th{background:#f0f0f0;width:40%}.notes{background:#fff3cd;border-left:3px solid #ffc107;padding:10pt;margin-top:15pt}</style></head><body>';
+            content += '<h1>' + title + '</h1>';
+            content += '<h2>1. INTERFACES DE REDE</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            if (portInfo.gigabitPorts) content += '<tr><td>Portas Gigabit Ethernet</td><td>Mínimo ' + portInfo.gigabitPorts + ' portas 10/100/1000Base-T RJ-45</td></tr>';
+            if (portInfo.sfpPorts) content += '<tr><td>Portas SFP/SFP+</td><td>Mínimo ' + portInfo.sfpPorts + ' portas ' + (portInfo.sfpSpeed || '10 Gbps') + '</td></tr>';
+            if (portInfo.poe) { content += '<tr><td>Suporte a PoE/PoE+</td><td>IEEE 802.3af/at</td></tr>'; if (portInfo.poeBudget) content += '<tr><td>Orçamento PoE</td><td>Mínimo ' + portInfo.poeBudget + 'W</td></tr>'; }
+            content += '<tr><td>Auto-negociação</td><td>Velocidade e duplex</td></tr></table>';
+            content += '<h2>2. DESEMPENHO</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            content += '<tr><td>Capacidade de Switching</td><td>' + (perfInfo.switchingCapacity ? 'Mínimo ' + perfInfo.switchingCapacity : 'Wire-speed') + '</td></tr>';
+            if (perfInfo.forwardingRate) content += '<tr><td>Taxa de Encaminhamento</td><td>Mínimo ' + perfInfo.forwardingRate + '</td></tr>';
+            content += '<tr><td>Tabela MAC</td><td>Mínimo ' + (perfInfo.macTable || '16.000') + ' entradas</td></tr>';
+            content += '<tr><td>Latência</td><td>Inferior a 5 µs</td></tr></table>';
+            content += '<h2>3. FUNCIONALIDADES DE CAMADA 2</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            content += '<tr><td>VLANs</td><td>IEEE 802.1Q (mínimo 4.094)</td></tr><tr><td>Spanning Tree</td><td>STP/RSTP/MSTP</td></tr><tr><td>Agregação</td><td>LACP (IEEE 802.3ad)</td></tr><tr><td>QoS</td><td>IEEE 802.1p</td></tr><tr><td>IGMP Snooping</td><td>v1/v2/v3</td></tr><tr><td>LLDP</td><td>IEEE 802.1AB</td></tr><tr><td>Jumbo Frames</td><td>Até 9.216 bytes</td></tr></table>';
+            content += '<h2>4. SEGURANÇA</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            content += '<tr><td>Controle de Acesso</td><td>IEEE 802.1X com RADIUS</td></tr><tr><td>ACLs</td><td>L2/L3/L4</td></tr><tr><td>Port Security</td><td>Limitação de MACs</td></tr><tr><td>DHCP Snooping</td><td>Proteção DHCP</td></tr><tr><td>ARP Inspection</td><td>DAI</td></tr><tr><td>Storm Control</td><td>Broadcast/Multicast/Unicast</td></tr></table>';
+            content += '<h2>5. GERENCIAMENTO</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            content += '<tr><td>CLI</td><td>Console e SSH v2</td></tr><tr><td>Interface Web</td><td>HTTPS</td></tr><tr><td>SNMP</td><td>v1, v2c, v3</td></tr><tr><td>Syslog</td><td>Servidor externo</td></tr><tr><td>NTP</td><td>Sincronização</td></tr><tr><td>Backup</td><td>TFTP/SFTP</td></tr></table>';
+            content += '<h2>6. CARACTERÍSTICAS FÍSICAS</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            content += '<tr><td>Formato</td><td>Rack 19"</td></tr><tr><td>Alimentação</td><td>100-240VAC, 50/60Hz</td></tr><tr><td>Temperatura</td><td>0°C a 45°C</td></tr><tr><td>Umidade</td><td>10% a 90%</td></tr><tr><td>Certificações</td><td>Anatel, CE, FCC</td></tr></table>';
+            content += '<h2>7. GARANTIA E SUPORTE</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            content += '<tr><td>Garantia</td><td>36 meses</td></tr><tr><td>Suporte</td><td>Português</td></tr><tr><td>Firmware</td><td>Atualizações gratuitas</td></tr><tr><td>Documentação</td><td>PT ou EN</td></tr></table>';
+            content += '<div class="notes"><b>Observações:</b> Especificação genérica conforme Lei 14.133/2021.</div></body></html>';
+            const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'especificacao_tecnica.doc'; link.click();
+            showToast('Word exportado!', 'success');
+        }
+
+        viewRawBtn.addEventListener('click', () => { if (generatedSpec) { rawText.textContent = generatedSpec.plainText; rawModal.classList.add('visible'); } });
+        modalClose.addEventListener('click', () => rawModal.classList.remove('visible'));
+        rawModal.addEventListener('click', (e) => { if (e.target === rawModal) rawModal.classList.remove('visible'); });
+
+        function showToast(message, type = 'success') { toastMessage.textContent = message; toast.className = 'toast ' + type + ' visible'; setTimeout(() => toast.classList.remove('visible'), 3000); }
+
+        function generateSpecification(content, category) {
+            const title = getCategoryTitle(category);
+            const portInfo = analyzePortsFromRaw(content);
+            const perfInfo = analyzePerformanceFromRaw(content);
+            let html = '', plainText = title + '\n' + '='.repeat(title.length) + '\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">' + title + '</div></div>';
+            html += '<div class="spec-section"><div class="spec-section-title">INTERFACES DE REDE</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            plainText += '1. INTERFACES DE REDE\n------------------------------\n';
+            if (portInfo.gigabitPorts) { html += '<tr><td>Portas Gigabit</td><td>Mínimo ' + portInfo.gigabitPorts + ' portas RJ-45</td></tr>'; plainText += '• Portas Gigabit: Mínimo ' + portInfo.gigabitPorts + '\n'; }
+            if (portInfo.sfpPorts) { html += '<tr><td>Portas SFP/SFP+</td><td>Mínimo ' + portInfo.sfpPorts + ' portas</td></tr>'; plainText += '• Portas SFP: Mínimo ' + portInfo.sfpPorts + '\n'; }
+            if (portInfo.poe) { html += '<tr><td>PoE</td><td>IEEE 802.3af/at</td></tr>'; plainText += '• PoE: IEEE 802.3af/at\n'; if (portInfo.poeBudget) { html += '<tr><td>Orçamento PoE</td><td>Mínimo ' + portInfo.poeBudget + 'W</td></tr>'; plainText += '• Orçamento PoE: ' + portInfo.poeBudget + 'W\n'; } }
+            html += '<tr><td>Auto-negociação</td><td>Velocidade e duplex</td></tr></table></div>';
+            plainText += '• Auto-negociação\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">DESEMPENHO</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
+            plainText += '2. DESEMPENHO\n------------------------------\n';
+            html += '<tr><td>Switching</td><td>' + (perfInfo.switchingCapacity ? 'Mínimo ' + perfInfo.switchingCapacity : 'Wire-speed') + '</td></tr>';
+            plainText += '• Switching: ' + (perfInfo.switchingCapacity || 'Wire-speed') + '\n';
+            if (perfInfo.forwardingRate) { html += '<tr><td>Encaminhamento</td><td>Mínimo ' + perfInfo.forwardingRate + '</td></tr>'; plainText += '• Encaminhamento: ' + perfInfo.forwardingRate + '\n'; }
+            html += '<tr><td>Tabela MAC</td><td>Mínimo ' + (perfInfo.macTable || '16.000') + ' entradas</td></tr>';
+            html += '<tr><td>Latência</td><td>< 5 µs</td></tr></table></div>';
+            plainText += '• Tabela MAC: ' + (perfInfo.macTable || '16.000') + '\n• Latência: < 5 µs\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">CAMADA 2</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
+            html += '<tr><td>VLANs</td><td>IEEE 802.1Q</td></tr><tr><td>STP</td><td>STP/RSTP/MSTP</td></tr><tr><td>LACP</td><td>IEEE 802.3ad</td></tr><tr><td>QoS</td><td>IEEE 802.1p</td></tr><tr><td>IGMP</td><td>v1/v2/v3</td></tr><tr><td>LLDP</td><td>IEEE 802.1AB</td></tr><tr><td>Jumbo</td><td>9.216 bytes</td></tr></table></div>';
+            plainText += '3. CAMADA 2\n------------------------------\n• VLANs: IEEE 802.1Q\n• STP/RSTP/MSTP\n• LACP: IEEE 802.3ad\n• QoS: IEEE 802.1p\n• IGMP Snooping\n• LLDP\n• Jumbo Frames\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">SEGURANÇA</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
+            html += '<tr><td>802.1X</td><td>Com RADIUS</td></tr><tr><td>ACLs</td><td>L2/L3/L4</td></tr><tr><td>Port Security</td><td>Limitação MACs</td></tr><tr><td>DHCP Snooping</td><td>Proteção</td></tr><tr><td>DAI</td><td>ARP Inspection</td></tr><tr><td>Storm Control</td><td>Proteção</td></tr></table></div>';
+            plainText += '4. SEGURANÇA\n------------------------------\n• 802.1X com RADIUS\n• ACLs L2/L3/L4\n• Port Security\n• DHCP Snooping\n• DAI\n• Storm Control\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">GERENCIAMENTO</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
+            html += '<tr><td>CLI</td><td>Console + SSH v2</td></tr><tr><td>Web</td><td>HTTPS</td></tr><tr><td>SNMP</td><td>v1/v2c/v3</td></tr><tr><td>Syslog</td><td>Externo</td></tr><tr><td>NTP</td><td>Sincronização</td></tr><tr><td>Backup</td><td>TFTP/SFTP</td></tr></table></div>';
+            plainText += '5. GERENCIAMENTO\n------------------------------\n• CLI: Console + SSH v2\n• Web: HTTPS\n• SNMP v1/v2c/v3\n• Syslog\n• NTP\n• Backup TFTP/SFTP\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">FÍSICO</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
+            html += '<tr><td>Formato</td><td>Rack 19"</td></tr><tr><td>Alimentação</td><td>100-240VAC</td></tr><tr><td>Temperatura</td><td>0-45°C</td></tr><tr><td>Umidade</td><td>10-90%</td></tr><tr><td>Certificações</td><td>Anatel/CE/FCC</td></tr></table></div>';
+            plainText += '6. FÍSICO\n------------------------------\n• Rack 19"\n• 100-240VAC\n• 0-45°C\n• 10-90% umidade\n• Anatel/CE/FCC\n\n';
+            
+            html += '<div class="spec-section"><div class="spec-section-title">GARANTIA</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
+            html += '<tr><td>Garantia</td><td>36 meses</td></tr><tr><td>Suporte</td><td>Português</td></tr><tr><td>Firmware</td><td>Atualizações</td></tr><tr><td>Manual</td><td>PT ou EN</td></tr></table></div>';
+            plainText += '7. GARANTIA\n------------------------------\n• 36 meses\n• Suporte PT\n• Firmware gratuito\n• Manual PT/EN\n\n';
+            
+            html += '<div class="spec-notes"><div class="spec-notes-title">Observações para o Edital</div><div class="spec-notes-text">Especificação genérica conforme Lei 14.133/2021.</div></div>';
+            plainText += 'OBSERVAÇÕES: Especificação genérica conforme Lei 14.133/2021.';
+            
+            return { html, plainText };
+        }
+
+        function getCategoryTitle(cat) {
+            const t = { 'switch': 'SWITCH DE REDE GERENCIÁVEL', 'router': 'ROTEADOR DE REDE', 'firewall': 'FIREWALL/UTM', 'access-point': 'PONTO DE ACESSO WIRELESS', 'server': 'SERVIDOR', 'storage': 'STORAGE', 'ups': 'NOBREAK/UPS', 'camera': 'CÂMERA IP', 'other': 'EQUIPAMENTO DE TI' };
+            return t[cat] || t.other;
+        }
+
+        function analyzePortsFromRaw(raw) {
+            const r = { gigabitPorts: null, sfpPorts: null, sfpSpeed: null, poe: false, poeBudget: null };
+            const l = raw.toLowerCase();
+            let m = l.match(/(\d+)\s*[x×]?\s*(?:port|porta)?\s*(?:10\/100\/1000|1g|gigabit|gbe)/i) || l.match(/(\d+)\s*[x×]\s*(?:rj-?45)/i);
+            if (m) r.gigabitPorts = parseInt(m[1]);
+            m = l.match(/(\d+)\s*[x×]?\s*(?:port|porta)?\s*(?:sfp\+?|10g)/i);
+            if (m) r.sfpPorts = parseInt(m[1]);
+            if (l.includes('10g') || l.includes('sfp+')) r.sfpSpeed = '10 Gbps';
+            r.poe = l.includes('poe') || l.includes('802.3af') || l.includes('802.3at');
+            m = l.match(/(\d+)\s*w(?:atts?)?\s*(?:poe|budget)/i) || l.match(/poe\s*(?:budget|power)?\s*:?\s*(\d+)\s*w/i);
+            if (m) r.poeBudget = parseInt(m[1]);
+            return r;
+        }
+
+        function analyzePerformanceFromRaw(raw) {
+            const r = { switchingCapacity: null, forwardingRate: null, macTable: null };
+            const l = raw.toLowerCase();
+            let m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:gbps|gb\/s)\s*(?:switching|capacity)/i) || l.match(/(?:switching|backplane)\s*(?:capacity)?\s*:?\s*(\d+(?:[.,]\d+)?)\s*(?:gbps)/i);
+            if (m) r.switchingCapacity = m[1].replace(',', '.') + ' Gbps';
+            m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:mpps)/i);
+            if (m) r.forwardingRate = m[1].replace(',', '.') + ' Mpps';
+            m = l.match(/(?:mac\s*(?:table|address))\s*:?\s*(\d+(?:[.,]\d+)?)\s*(k|mil)?/i) || l.match(/(\d+(?:[.,]\d+)?)\s*(k)?\s*(?:mac|endereços)/i);
+            if (m) { let v = parseFloat(m[1].replace(',', '.')); if (m[2] && m[2].toLowerCase() === 'k') v *= 1000; r.macTable = Math.round(v).toLocaleString('pt-BR'); }
+            return r;
+        }
+    </script>
+</body>
+</html>
