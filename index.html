@@ -69,7 +69,7 @@
         .output-content.visible { display: block; }
         .spec-section { margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); }
         .spec-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .spec-section-title { font-size: 0.85rem; font-weight: 600; color: var(--accent-primary); margin-bottom: 0.6rem; }
+        .spec-section-title { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.6rem; }
         .spec-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         .spec-table th, .spec-table td { padding: 0.55rem 0.7rem; text-align: left; border: 1px solid var(--border-color); }
         .spec-table th { background: var(--bg-secondary); color: var(--text-secondary); font-weight: 500; width: 40%; }
@@ -277,29 +277,66 @@
             const title = getCategoryTitle(selectedCategory);
             const portInfo = analyzePortsFromRaw(datasheetText.value);
             const perfInfo = analyzePerformanceFromRaw(datasheetText.value);
-            let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>body{font-family:Arial;font-size:11pt}h1{font-size:14pt;text-align:center}h2{font-size:12pt;border-bottom:1px solid #333;margin-top:14pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:6pt}th{background:#f0f0f0;width:40%}.notes{background:#fff3cd;border-left:3px solid #ffc107;padding:10pt;margin-top:15pt}</style></head><body>';
+            let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>@page{margin:3cm 2cm 2cm 3cm}body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.5;text-align:justify}h1{font-size:14pt;font-weight:bold;text-align:center;text-transform:uppercase;margin-bottom:24pt}h2{font-size:12pt;font-weight:bold;margin-top:18pt;margin-bottom:12pt}p{text-indent:1.25cm;margin-bottom:12pt}ul{margin-left:1.25cm;margin-bottom:12pt;list-style-type:none}li{margin-bottom:6pt;text-align:justify}</style></head><body>';
+            content += '<h1>ESPECIFICACAO TECNICA</h1>';
             content += '<h1>' + title + '</h1>';
-            content += '<h2>1. INTERFACES DE REDE</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            if (portInfo.gigabitPorts) content += '<tr><td>Portas Gigabit Ethernet</td><td>Mínimo ' + portInfo.gigabitPorts + ' portas 10/100/1000Base-T RJ-45</td></tr>';
-            if (portInfo.sfpPorts) content += '<tr><td>Portas SFP/SFP+</td><td>Mínimo ' + portInfo.sfpPorts + ' portas ' + (portInfo.sfpSpeed || '10 Gbps') + '</td></tr>';
-            if (portInfo.poe) { content += '<tr><td>Suporte a PoE/PoE+</td><td>IEEE 802.3af/at</td></tr>'; if (portInfo.poeBudget) content += '<tr><td>Orçamento PoE</td><td>Mínimo ' + portInfo.poeBudget + 'W</td></tr>'; }
-            content += '<tr><td>Auto-negociação</td><td>Velocidade e duplex</td></tr></table>';
-            content += '<h2>2. DESEMPENHO</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            content += '<tr><td>Capacidade de Switching</td><td>' + (perfInfo.switchingCapacity ? 'Mínimo ' + perfInfo.switchingCapacity : 'Wire-speed') + '</td></tr>';
-            if (perfInfo.forwardingRate) content += '<tr><td>Taxa de Encaminhamento</td><td>Mínimo ' + perfInfo.forwardingRate + '</td></tr>';
-            content += '<tr><td>Tabela MAC</td><td>Mínimo ' + (perfInfo.macTable || '16.000') + ' entradas</td></tr>';
-            content += '<tr><td>Latência</td><td>Inferior a 5 µs</td></tr></table>';
-            content += '<h2>3. FUNCIONALIDADES DE CAMADA 2</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            content += '<tr><td>VLANs</td><td>IEEE 802.1Q (mínimo 4.094)</td></tr><tr><td>Spanning Tree</td><td>STP/RSTP/MSTP</td></tr><tr><td>Agregação</td><td>LACP (IEEE 802.3ad)</td></tr><tr><td>QoS</td><td>IEEE 802.1p</td></tr><tr><td>IGMP Snooping</td><td>v1/v2/v3</td></tr><tr><td>LLDP</td><td>IEEE 802.1AB</td></tr><tr><td>Jumbo Frames</td><td>Até 9.216 bytes</td></tr></table>';
-            content += '<h2>4. SEGURANÇA</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            content += '<tr><td>Controle de Acesso</td><td>IEEE 802.1X com RADIUS</td></tr><tr><td>ACLs</td><td>L2/L3/L4</td></tr><tr><td>Port Security</td><td>Limitação de MACs</td></tr><tr><td>DHCP Snooping</td><td>Proteção DHCP</td></tr><tr><td>ARP Inspection</td><td>DAI</td></tr><tr><td>Storm Control</td><td>Broadcast/Multicast/Unicast</td></tr></table>';
-            content += '<h2>5. GERENCIAMENTO</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            content += '<tr><td>CLI</td><td>Console e SSH v2</td></tr><tr><td>Interface Web</td><td>HTTPS</td></tr><tr><td>SNMP</td><td>v1, v2c, v3</td></tr><tr><td>Syslog</td><td>Servidor externo</td></tr><tr><td>NTP</td><td>Sincronização</td></tr><tr><td>Backup</td><td>TFTP/SFTP</td></tr></table>';
-            content += '<h2>6. CARACTERÍSTICAS FÍSICAS</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            content += '<tr><td>Formato</td><td>Rack 19"</td></tr><tr><td>Alimentação</td><td>100-240VAC, 50/60Hz</td></tr><tr><td>Temperatura</td><td>0°C a 45°C</td></tr><tr><td>Umidade</td><td>10% a 90%</td></tr><tr><td>Certificações</td><td>Anatel, CE, FCC</td></tr></table>';
-            content += '<h2>7. GARANTIA E SUPORTE</h2><table><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            content += '<tr><td>Garantia</td><td>36 meses</td></tr><tr><td>Suporte</td><td>Português</td></tr><tr><td>Firmware</td><td>Atualizações gratuitas</td></tr><tr><td>Documentação</td><td>PT ou EN</td></tr></table>';
-            content += '<div class="notes"><b>Observações:</b> Especificação genérica conforme Lei 14.133/2021.</div></body></html>';
+            content += '<h2>1 INTERFACES DE REDE</h2><ul>';
+            if (portInfo.gigabitPorts) content += '<li>a) Possuir no minimo ' + portInfo.gigabitPorts + ' portas Gigabit Ethernet 10/100/1000Base-T com conectores RJ-45;</li>';
+            if (portInfo.sfpPorts) content += '<li>b) Possuir no minimo ' + portInfo.sfpPorts + ' portas SFP/SFP+ para uplink com velocidade de ' + (portInfo.sfpSpeed || '10 Gbps') + ';</li>';
+            if (portInfo.poe) { content += '<li>c) Suportar Power over Ethernet (PoE/PoE+) compativel com os padroes IEEE 802.3af e IEEE 802.3at;</li>'; if (portInfo.poeBudget) content += '<li>d) Possuir orcamento PoE total de no minimo ' + portInfo.poeBudget + 'W;</li>'; }
+            content += '<li>e) Suportar auto-negociacao de velocidade e modo duplex em todas as portas;</li>';
+            content += '<li>f) Suportar deteccao automatica de cabo crossover (Auto MDI/MDI-X);</li></ul>';
+            content += '<h2>2 DESEMPENHO</h2><ul>';
+            content += '<li>a) Possuir capacidade de switching de no minimo ' + (perfInfo.switchingCapacity || 'valor suficiente para operacao nao bloqueante (wire-speed)') + ';</li>';
+            if (perfInfo.forwardingRate) content += '<li>b) Possuir taxa de encaminhamento de pacotes de no minimo ' + perfInfo.forwardingRate + ';</li>';
+            content += '<li>c) Suportar tabela de enderecos MAC com no minimo ' + (perfInfo.macTable || '16.000') + ' entradas;</li>';
+            content += '<li>d) Possuir latencia inferior a 5 microssegundos para frames de 64 bytes;</li>';
+            content += '<li>e) Possuir memoria de buffer suficiente para operacao em alta demanda;</li></ul>';
+            content += '<h2>3 FUNCIONALIDADES DE CAMADA 2</h2><ul>';
+            content += '<li>a) Suportar no minimo 4.094 VLANs simultaneas conforme padrao IEEE 802.1Q;</li>';
+            content += '<li>b) Suportar protocolo Spanning Tree (STP) conforme IEEE 802.1D;</li>';
+            content += '<li>c) Suportar protocolo Rapid Spanning Tree (RSTP) conforme IEEE 802.1w;</li>';
+            content += '<li>d) Suportar protocolo Multiple Spanning Tree (MSTP) conforme IEEE 802.1s;</li>';
+            content += '<li>e) Suportar agregacao de links (Link Aggregation) conforme padrao IEEE 802.3ad (LACP);</li>';
+            content += '<li>f) Suportar qualidade de servico (QoS) conforme IEEE 802.1p com no minimo 4 filas por porta;</li>';
+            content += '<li>g) Suportar IGMP Snooping nas versoes 1, 2 e 3;</li>';
+            content += '<li>h) Suportar protocolo LLDP (Link Layer Discovery Protocol) conforme IEEE 802.1AB;</li>';
+            content += '<li>i) Suportar Jumbo Frames de ate 9.216 bytes;</li></ul>';
+            content += '<h2>4 SEGURANCA</h2><ul>';
+            content += '<li>a) Suportar autenticacao de usuarios conforme padrao IEEE 802.1X com integracao a servidores RADIUS;</li>';
+            content += '<li>b) Suportar listas de controle de acesso (ACLs) baseadas em informacoes de camada 2, 3 e 4;</li>';
+            content += '<li>c) Suportar limitacao de enderecos MAC por porta (Port Security);</li>';
+            content += '<li>d) Possuir protecao contra MAC flooding;</li>';
+            content += '<li>e) Suportar DHCP Snooping para protecao contra servidores DHCP nao autorizados;</li>';
+            content += '<li>f) Suportar Dynamic ARP Inspection (DAI) para prevencao de ataques ARP spoofing;</li>';
+            content += '<li>g) Suportar controle de tempestade (Storm Control) para trafego broadcast, multicast e unicast;</li>';
+            content += '<li>h) Suportar isolamento de portas (Private VLAN ou similar);</li></ul>';
+            content += '<h2>5 GERENCIAMENTO</h2><ul>';
+            content += '<li>a) Possuir interface de linha de comando (CLI) acessivel via porta console serial e conexao SSH versao 2;</li>';
+            content += '<li>b) Possuir interface grafica de gerenciamento via protocolo HTTPS com certificado SSL/TLS;</li>';
+            content += '<li>c) Suportar protocolo SNMP nas versoes 1, 2c e 3 com MIBs padrao;</li>';
+            content += '<li>d) Suportar envio de logs para servidor Syslog externo;</li>';
+            content += '<li>e) Suportar sincronizacao de relogio via protocolo NTP ou SNTP;</li>';
+            content += '<li>f) Suportar backup e restauracao de configuracao via protocolos TFTP ou SFTP;</li>';
+            content += '<li>g) Suportar atualizacao de firmware via interface web ou linha de comando;</li>';
+            content += '<li>h) Suportar espelhamento de portas (Port Mirroring) para analise de trafego;</li></ul>';
+            content += '<h2>6 CARACTERISTICAS FISICAS E ALIMENTACAO</h2><ul>';
+            content += '<li>a) Possuir formato adequado para instalacao em rack padrao de 19 polegadas, quando aplicavel;</li>';
+            content += '<li>b) Possuir fonte de alimentacao interna com selecao automatica de tensao (bivolt) operando na faixa de 100 a 240 VAC e frequencia de 50/60 Hz;</li>';
+            content += '<li>c) Operar em temperatura ambiente de 0 graus Celsius a 45 graus Celsius;</li>';
+            content += '<li>d) Operar em umidade relativa do ar de 10 por cento a 90 por cento, sem condensacao;</li>';
+            content += '<li>e) Possuir indicadores luminosos (LEDs) de status de funcionamento e atividade das portas;</li>';
+            content += '<li>f) Possuir homologacao da Anatel ou certificacoes equivalentes (CE, FCC);</li>';
+            content += '<li>g) Acompanhar cabo de alimentacao, kit de montagem em rack quando aplicavel, e documentacao tecnica;</li></ul>';
+            content += '<h2>7 GARANTIA E SUPORTE</h2><ul>';
+            content += '<li>a) Possuir garantia do fabricante de no minimo 36 (trinta e seis) meses, contados a partir da data do recebimento definitivo do equipamento;</li>';
+            content += '<li>b) Disponibilizar suporte tecnico em lingua portuguesa, por telefone e/ou correio eletronico, durante o periodo de garantia;</li>';
+            content += '<li>c) Disponibilizar gratuitamente atualizacoes de firmware durante o periodo de garantia;</li>';
+            content += '<li>d) Fornecer manual tecnico completo em lingua portuguesa ou inglesa;</li></ul>';
+            content += '<h2>8 OBSERVACOES</h2>';
+            content += '<p>A presente especificacao tecnica foi elaborada de forma generica, sem direcionamento a fabricante ou modelo especifico, em conformidade com o principio da competitividade estabelecido na Lei numero 14.133, de 1 de abril de 2021 (Nova Lei de Licitacoes e Contratos Administrativos).</p>';
+            content += '<p>Recomenda-se que o orgao licitante verifique se as especificacoes apresentadas atendem plenamente as necessidades da instituicao, bem como se estao em conformidade com as normas tecnicas aplicaveis e a legislacao vigente.</p>';
+            content += '</body></html>';
             const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
             const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'especificacao_tecnica.doc'; link.click();
             showToast('Word exportado!', 'success');
