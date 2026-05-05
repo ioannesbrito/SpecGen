@@ -54,7 +54,8 @@
         .datasheet-textarea { width: 100%; min-height: 180px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.85rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-primary); resize: vertical; }
         .datasheet-textarea:focus { outline: none; border-color: var(--accent-primary); }
         .datasheet-textarea::placeholder { color: var(--text-muted); }
-        .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
+        @media (max-width: 768px) { .category-grid { grid-template-columns: repeat(2, 1fr); } }
         .category-btn { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.6rem 0.5rem; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; transition: all 0.2s ease; text-align: center; font-family: 'Inter', sans-serif; }
         .category-btn:hover { border-color: var(--accent-primary); color: var(--text-primary); }
         .category-btn.selected { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--bg-primary); font-weight: 500; }
@@ -143,7 +144,7 @@
                     <div class="input-help">Copie e cole as especificações diretamente do PDF ou site do fabricante</div>
                 </div>
                 <div class="input-section">
-                    <label class="input-label">Categoria do Equipamento</label>
+                    <label class="input-label">Categoria do Equipamento/Material</label>
                     <div class="category-grid">
                         <button class="category-btn selected" data-category="switch">Switch</button>
                         <button class="category-btn" data-category="router">Roteador</button>
@@ -153,42 +154,25 @@
                         <button class="category-btn" data-category="storage">Storage</button>
                         <button class="category-btn" data-category="ups">Nobreak/UPS</button>
                         <button class="category-btn" data-category="camera">Câmera IP</button>
+                        <button class="category-btn" data-category="dvr-nvr">DVR/NVR</button>
+                        <button class="category-btn" data-category="rack">Rack</button>
+                        <button class="category-btn" data-category="cable-utp">Cabo UTP</button>
+                        <button class="category-btn" data-category="cable-fiber">Cabo Fibra Óptica</button>
+                        <button class="category-btn" data-category="conduit">Eletroduto</button>
+                        <button class="category-btn" data-category="cable-electric">Cabo Elétrico</button>
+                        <button class="category-btn" data-category="circuit-breaker">Disjuntor</button>
+                        <button class="category-btn" data-category="panel">Quadro Elétrico</button>
+                        <button class="category-btn" data-category="generator">Gerador</button>
+                        <button class="category-btn" data-category="solar-panel">Painel Solar</button>
                         <button class="category-btn" data-category="other">Outro</button>
                     </div>
                 </div>
                 <div class="input-section">
-                    <label class="input-label">Quantidade de Itens por Secao (Word)</label>
-                    <div class="items-config">
-                        <div class="item-config-row">
-                            <span class="item-config-label">Interfaces de Rede</span>
-                            <input type="number" class="item-config-input" id="itemsInterfaces" value="6" min="1" max="15">
-                        </div>
-                        <div class="item-config-row">
-                            <span class="item-config-label">Desempenho</span>
-                            <input type="number" class="item-config-input" id="itemsDesempenho" value="5" min="1" max="15">
-                        </div>
-                        <div class="item-config-row">
-                            <span class="item-config-label">Camada 2</span>
-                            <input type="number" class="item-config-input" id="itemsCamada2" value="9" min="1" max="15">
-                        </div>
-                        <div class="item-config-row">
-                            <span class="item-config-label">Seguranca</span>
-                            <input type="number" class="item-config-input" id="itemsSeguranca" value="8" min="1" max="15">
-                        </div>
-                        <div class="item-config-row">
-                            <span class="item-config-label">Gerenciamento</span>
-                            <input type="number" class="item-config-input" id="itemsGerenciamento" value="8" min="1" max="15">
-                        </div>
-                        <div class="item-config-row">
-                            <span class="item-config-label">Fisico/Alimentacao</span>
-                            <input type="number" class="item-config-input" id="itemsFisico" value="7" min="1" max="15">
-                        </div>
-                        <div class="item-config-row">
-                            <span class="item-config-label">Garantia/Suporte</span>
-                            <input type="number" class="item-config-input" id="itemsGarantia" value="4" min="1" max="15">
-                        </div>
+                    <label class="input-label">Configuração das Seções (Word)</label>
+                    <div class="items-config" id="itemsConfigContainer">
+                        <!-- Preenchido dinamicamente conforme categoria -->
                     </div>
-                    <div class="input-help">Defina quantos itens deseja em cada secao do documento Word</div>
+                    <div class="input-help">As seções e quantidade de itens se ajustam conforme a categoria</div>
                 </div>
                 <button class="generate-btn" id="generateBtn">Gerar Especificação Técnica</button>
                 <div class="tips-section">
@@ -258,13 +242,988 @@
         const rawText = document.getElementById('rawText');
         const modalClose = document.getElementById('modalClose');
 
+
+        // ============================================================
+        // TEMPLATES POR CATEGORIA - cada categoria tem suas proprias secoes
+        // ============================================================
+        const CATEGORY_TEMPLATES = {
+            'switch': {
+                title: 'SWITCH DE REDE GERENCIAVEL',
+                sections: {
+                    'INTERFACES DE REDE': { default: 6, items: (d) => [
+                        d.gigabitPorts ? 'Possuir no minimo ' + d.gigabitPorts + ' portas Gigabit Ethernet 10/100/1000Base-T com conectores RJ-45' : 'Possuir portas Gigabit Ethernet 10/100/1000Base-T com conectores RJ-45',
+                        d.sfpPorts ? 'Possuir no minimo ' + d.sfpPorts + ' portas SFP/SFP+ para uplink com velocidade de ' + (d.sfpSpeed || '10 Gbps') : 'Possuir portas SFP/SFP+ para uplink de alta velocidade',
+                        'Suportar Power over Ethernet (PoE/PoE+) compativel com IEEE 802.3af e IEEE 802.3at',
+                        d.poeBudget ? 'Possuir orcamento PoE total de no minimo ' + d.poeBudget + 'W' : 'Possuir orcamento PoE adequado a quantidade de portas',
+                        'Suportar auto-negociacao de velocidade e modo duplex em todas as portas',
+                        'Suportar deteccao automatica de cabo crossover (Auto MDI/MDI-X)',
+                        'Possuir todas as portas com capacidade de operacao em wire-speed',
+                        'Suportar Energy Efficient Ethernet (IEEE 802.3az)'
+                    ]},
+                    'DESEMPENHO': { default: 5, items: (d) => [
+                        'Possuir capacidade de switching de no minimo ' + (d.switchingCapacity || 'valor suficiente para operacao nao bloqueante'),
+                        d.forwardingRate ? 'Possuir taxa de encaminhamento de no minimo ' + d.forwardingRate : 'Possuir taxa de encaminhamento adequada para wire-speed',
+                        'Suportar tabela de enderecos MAC com no minimo ' + (d.macTable || '16.000') + ' entradas',
+                        'Possuir latencia inferior a 5 microssegundos para frames de 64 bytes',
+                        'Possuir memoria de buffer suficiente para alta demanda',
+                        'Suportar arquitetura store-and-forward',
+                        'Possuir processador dedicado para operacoes de switching'
+                    ]},
+                    'CAMADA 2': { default: 9, items: () => [
+                        'Suportar no minimo 4.094 VLANs simultaneas conforme IEEE 802.1Q',
+                        'Suportar Spanning Tree (STP) conforme IEEE 802.1D',
+                        'Suportar Rapid Spanning Tree (RSTP) conforme IEEE 802.1w',
+                        'Suportar Multiple Spanning Tree (MSTP) conforme IEEE 802.1s',
+                        'Suportar agregacao de links conforme IEEE 802.3ad (LACP)',
+                        'Suportar QoS conforme IEEE 802.1p com no minimo 4 filas por porta',
+                        'Suportar IGMP Snooping versoes 1, 2 e 3',
+                        'Suportar protocolo LLDP conforme IEEE 802.1AB',
+                        'Suportar Jumbo Frames de ate 9.216 bytes',
+                        'Suportar VLAN por porta, protocolo e MAC'
+                    ]},
+                    'SEGURANCA': { default: 8, items: () => [
+                        'Suportar autenticacao IEEE 802.1X com integracao a servidores RADIUS',
+                        'Suportar listas de controle de acesso (ACLs) baseadas em camadas 2, 3 e 4',
+                        'Suportar Port Security com limitacao de enderecos MAC por porta',
+                        'Possuir protecao contra MAC flooding',
+                        'Suportar DHCP Snooping',
+                        'Suportar Dynamic ARP Inspection (DAI)',
+                        'Suportar Storm Control para broadcast, multicast e unicast',
+                        'Suportar isolamento de portas (Private VLAN)',
+                        'Suportar IP Source Guard'
+                    ]},
+                    'GERENCIAMENTO': { default: 8, items: () => [
+                        'Possuir CLI via porta console serial e SSH versao 2',
+                        'Possuir interface web HTTPS com certificado SSL/TLS',
+                        'Suportar SNMP versoes 1, 2c e 3',
+                        'Suportar envio de logs para Syslog externo',
+                        'Suportar sincronizacao de horario via NTP ou SNTP',
+                        'Suportar backup e restauracao via TFTP ou SFTP',
+                        'Suportar atualizacao de firmware via web ou CLI',
+                        'Suportar Port Mirroring para analise de trafego',
+                        'Suportar multiplos niveis de acesso administrativo'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 7, items: () => [
+                        'Possuir formato para instalacao em rack 19 polegadas',
+                        'Possuir fonte interna bivolt (100 a 240 VAC, 50/60 Hz)',
+                        'Operar em temperatura de 0 a 45 graus Celsius',
+                        'Operar em umidade de 10 a 90 por cento sem condensacao',
+                        'Possuir LEDs de status de funcionamento e atividade das portas',
+                        'Possuir homologacao Anatel ou certificacoes equivalentes',
+                        'Acompanhar cabo de alimentacao, kit de rack e documentacao'
+                    ]},
+                    'GARANTIA E SUPORTE': { default: 4, items: () => [
+                        'Garantia minima de 36 (trinta e seis) meses do fabricante',
+                        'Suporte tecnico em portugues durante a garantia',
+                        'Atualizacoes de firmware gratuitas durante a garantia',
+                        'Manual tecnico em portugues ou ingles'
+                    ]}
+                }
+            },
+            'router': {
+                title: 'ROTEADOR DE REDE',
+                sections: {
+                    'INTERFACES E CONECTIVIDADE': { default: 5, items: (d) => [
+                        d.gigabitPorts ? 'Possuir no minimo ' + d.gigabitPorts + ' portas Gigabit Ethernet RJ-45' : 'Possuir no minimo 4 portas Gigabit Ethernet RJ-45',
+                        'Possuir portas WAN dedicadas para conexao a operadoras',
+                        'Suportar interfaces SFP/SFP+ para fibra optica',
+                        'Suportar conexoes seriais para integracao com modens',
+                        'Suportar interface USB para modens 4G/5G como redundancia',
+                        'Possuir porta de console para gerenciamento local'
+                    ]},
+                    'ROTEAMENTO': { default: 7, items: () => [
+                        'Suportar roteamento estatico IPv4 e IPv6',
+                        'Suportar protocolo RIP versao 2 conforme RFC 2453',
+                        'Suportar protocolo OSPF versoes 2 e 3',
+                        'Suportar protocolo BGP versao 4 conforme RFC 4271',
+                        'Suportar Policy-Based Routing (PBR)',
+                        'Suportar VRF (Virtual Routing and Forwarding)',
+                        'Suportar IPv6 com dual-stack',
+                        'Suportar Multicast (PIM-SM, PIM-DM)'
+                    ]},
+                    'SEGURANCA': { default: 7, items: () => [
+                        'Suportar firewall stateful integrado',
+                        'Suportar VPN IPsec site-to-site e client-to-site',
+                        'Suportar VPN SSL/TLS',
+                        'Suportar ACLs baseadas em IP, porta e protocolo',
+                        'Suportar protecao contra ataques DoS e DDoS',
+                        'Suportar autenticacao via RADIUS e TACACS+',
+                        'Suportar criptografia AES 128 e 256 bits'
+                    ]},
+                    'QOS': { default: 5, items: () => [
+                        'Suportar QoS com classificacao e marcacao de pacotes',
+                        'Suportar Priority Queuing',
+                        'Suportar Class-Based Weighted Fair Queuing',
+                        'Suportar Traffic Shaping por interface ou aplicacao',
+                        'Suportar DiffServ conforme RFC 2474'
+                    ]},
+                    'GERENCIAMENTO': { default: 6, items: () => [
+                        'Possuir CLI via SSH versao 2',
+                        'Possuir interface web HTTPS',
+                        'Suportar SNMP versoes 1, 2c e 3',
+                        'Suportar Syslog para servidor externo',
+                        'Suportar NTP para sincronizacao',
+                        'Suportar NetFlow ou sFlow para analise de trafego'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 5, items: () => [
+                        'Possuir formato para rack 19 polegadas',
+                        'Possuir fonte bivolt automatica',
+                        'Operar em 0 a 45 graus Celsius',
+                        'Possuir homologacao Anatel',
+                        'Acompanhar cabos, kit de rack e documentacao'
+                    ]},
+                    'GARANTIA': { default: 4, items: () => [
+                        'Garantia minima de 36 meses do fabricante',
+                        'Suporte tecnico em portugues',
+                        'Atualizacoes de firmware gratuitas',
+                        'Manual em portugues ou ingles'
+                    ]}
+                }
+            },
+            'firewall': {
+                title: 'FIREWALL DE PROXIMA GERACAO (NGFW)',
+                sections: {
+                    'INTERFACES E DESEMPENHO': { default: 7, items: () => [
+                        'Possuir no minimo 8 portas Gigabit Ethernet RJ-45',
+                        'Possuir portas SFP/SFP+ para fibra optica',
+                        'Possuir throughput de firewall de no minimo 1 Gbps',
+                        'Possuir throughput de IPS de no minimo 500 Mbps',
+                        'Possuir throughput de VPN IPsec de no minimo 500 Mbps',
+                        'Suportar no minimo 1.000.000 de sessoes simultaneas',
+                        'Suportar no minimo 30.000 novas sessoes por segundo'
+                    ]},
+                    'FUNCIONALIDADES DE FIREWALL': { default: 9, items: () => [
+                        'Operar como firewall stateful com inspecao de pacotes',
+                        'Suportar politicas baseadas em zonas de seguranca',
+                        'Suportar NAT e PAT',
+                        'Suportar Application Control (camada 7)',
+                        'Suportar User Identity com Active Directory/LDAP',
+                        'Suportar filtragem de URL com base de dados de categorias',
+                        'Suportar SSL Inspection',
+                        'Suportar Deep Packet Inspection (DPI)',
+                        'Suportar Geo-IP filtering'
+                    ]},
+                    'PROTECAO E IPS': { default: 7, items: () => [
+                        'Possuir IPS (Intrusion Prevention System) integrado',
+                        'Possuir antivirus de gateway integrado',
+                        'Possuir antimalware com sandboxing',
+                        'Possuir antispam para email',
+                        'Suportar protecao contra ataques DDoS',
+                        'Suportar protecao contra zero-day attacks',
+                        'Possuir base de assinaturas atualizada automaticamente'
+                    ]},
+                    'VPN': { default: 5, items: () => [
+                        'Suportar VPN IPsec site-to-site',
+                        'Suportar VPN SSL/TLS para acesso remoto',
+                        'Suportar criptografia AES-128, AES-256 e 3DES',
+                        'Suportar autenticacao por certificado digital',
+                        'Suportar autenticacao multifator (MFA)'
+                    ]},
+                    'ALTA DISPONIBILIDADE': { default: 4, items: () => [
+                        'Suportar cluster Active-Passive',
+                        'Suportar cluster Active-Active',
+                        'Suportar sincronizacao de sessoes entre membros do cluster',
+                        'Suportar failover automatico'
+                    ]},
+                    'GERENCIAMENTO': { default: 6, items: () => [
+                        'Possuir interface web HTTPS',
+                        'Possuir CLI via SSH versao 2',
+                        'Suportar SNMP versoes 2c e 3',
+                        'Suportar Syslog externo',
+                        'Possuir sistema de relatorios e dashboards',
+                        'Suportar gerenciamento centralizado'
+                    ]},
+                    'GARANTIA E LICENCIAMENTO': { default: 5, items: () => [
+                        'Garantia de hardware de no minimo 36 meses',
+                        'Subscricao de servicos de seguranca por no minimo 36 meses (IPS, antivirus, filtro web)',
+                        'Atualizacoes de assinaturas durante a vigencia',
+                        'Suporte tecnico 24x7 em portugues',
+                        'Manual em portugues ou ingles'
+                    ]}
+                }
+            },
+            'access-point': {
+                title: 'PONTO DE ACESSO WIRELESS',
+                sections: {
+                    'PADROES E RADIO': { default: 7, items: () => [
+                        'Suportar IEEE 802.11a/b/g/n/ac/ax (Wi-Fi 6)',
+                        'Possuir radio dual-band simultaneo (2.4 GHz e 5 GHz)',
+                        'Suportar largura de canal de 20, 40, 80 e 160 MHz',
+                        'Suportar MU-MIMO',
+                        'Suportar OFDMA',
+                        'Possuir antenas internas com no minimo 4x4 MIMO',
+                        'Suportar BSS Coloring'
+                    ]},
+                    'DESEMPENHO': { default: 6, items: () => [
+                        'Suportar taxa agregada de no minimo 3 Gbps',
+                        'Suportar no minimo 512 clientes simultaneos',
+                        'Suportar Beamforming',
+                        'Suportar band steering',
+                        'Suportar load balancing entre access points',
+                        'Suportar fast roaming IEEE 802.11r/k/v'
+                    ]},
+                    'INTERFACES': { default: 4, items: () => [
+                        'Possuir no minimo 1 porta Gigabit Ethernet com PoE+ (IEEE 802.3at)',
+                        'Suportar alimentacao via PoE+ ou fonte externa DC',
+                        'Possuir porta de console para gerenciamento local',
+                        'Suportar Bluetooth Low Energy (BLE)'
+                    ]},
+                    'SEGURANCA WIRELESS': { default: 7, items: () => [
+                        'Suportar WPA3-Personal e WPA3-Enterprise',
+                        'Suportar WPA2-Personal e WPA2-Enterprise',
+                        'Suportar IEEE 802.1X com RADIUS',
+                        'Suportar criptografia AES e TKIP',
+                        'Suportar Captive Portal',
+                        'Suportar isolamento de clientes wireless',
+                        'Suportar Wireless Intrusion Detection System (WIDS)'
+                    ]},
+                    'GERENCIAMENTO': { default: 5, items: () => [
+                        'Suportar gerenciamento centralizado via controladora',
+                        'Suportar gerenciamento standalone via web HTTPS',
+                        'Suportar SNMP versoes 2c e 3',
+                        'Suportar protocolo CAPWAP',
+                        'Suportar no minimo 16 SSIDs com VLANs distintas'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 5, items: () => [
+                        'Possuir formato para instalacao em teto ou parede',
+                        'Operar em 0 a 50 graus Celsius',
+                        'Operar em umidade de 10 a 95 por cento',
+                        'Possuir homologacao Anatel',
+                        'Acompanhar kit de fixacao e documentacao'
+                    ]},
+                    'GARANTIA': { default: 4, items: () => [
+                        'Garantia minima de 36 meses do fabricante',
+                        'Suporte tecnico em portugues',
+                        'Atualizacoes de firmware gratuitas',
+                        'Manual em portugues ou ingles'
+                    ]}
+                }
+            },
+            'server': {
+                title: 'SERVIDOR DE RACK',
+                sections: {
+                    'PROCESSADOR': { default: 5, items: () => [
+                        'Possuir no minimo 2 (dois) processadores instalados',
+                        'Possuir processadores x86-64 com no minimo 16 nucleos cada',
+                        'Possuir frequencia base minima de 2.4 GHz por nucleo',
+                        'Suportar virtualizacao Intel VT-x ou AMD-V',
+                        'Possuir cache L3 de no minimo 32 MB por processador'
+                    ]},
+                    'MEMORIA RAM': { default: 4, items: () => [
+                        'Possuir no minimo 128 GB de memoria RAM DDR4 ou DDR5 ECC instalada',
+                        'Possuir frequencia minima de 3200 MHz',
+                        'Possuir capacidade de expansao para no minimo 1 TB',
+                        'Suportar tecnologia ECC (Error Correcting Code)'
+                    ]},
+                    'ARMAZENAMENTO': { default: 5, items: () => [
+                        'Possuir no minimo 2 SSDs de 480 GB para sistema operacional em RAID 1',
+                        'Possuir no minimo 4 unidades SSD ou HDD SAS de 1.2 TB para dados',
+                        'Possuir controladora RAID com cache de no minimo 2 GB e bateria',
+                        'Suportar RAID 0, 1, 5, 6 e 10',
+                        'Suportar troca a quente (hot-swap) de unidades'
+                    ]},
+                    'INTERFACES DE REDE': { default: 4, items: () => [
+                        'Possuir no minimo 4 portas Gigabit Ethernet onboard',
+                        'Possuir no minimo 2 portas SFP+ 10 Gbps',
+                        'Suportar agregacao de links (LACP)',
+                        'Possuir interface dedicada para gerenciamento out-of-band'
+                    ]},
+                    'EXPANSAO E SLOTS': { default: 3, items: () => [
+                        'Possuir no minimo 4 slots PCIe Gen4 livres',
+                        'Possuir no minimo 4 portas USB 3.0',
+                        'Possuir porta VGA para conexao de monitor'
+                    ]},
+                    'ALIMENTACAO E REFRIGERACAO': { default: 4, items: () => [
+                        'Possuir no minimo 2 fontes redundantes hot-swap',
+                        'Possuir fontes 80 PLUS Platinum ou superior',
+                        'Possuir fontes bivolt automaticas (100 a 240 VAC)',
+                        'Possuir ventiladores hot-swap redundantes'
+                    ]},
+                    'GERENCIAMENTO': { default: 5, items: () => [
+                        'Possuir processador de gerenciamento out-of-band dedicado',
+                        'Suportar acesso remoto KVM via web',
+                        'Suportar virtual media para instalacao remota de SO',
+                        'Suportar IPMI 2.0, Redfish e SNMP',
+                        'Suportar monitoramento de hardware'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 4, items: () => [
+                        'Possuir formato rack 19 polegadas com altura maxima de 2U',
+                        'Acompanhar trilhos para rack',
+                        'Possuir bezel frontal removivel',
+                        'Possuir certificacoes Anatel, CE, FCC ou equivalentes'
+                    ]},
+                    'GARANTIA': { default: 4, items: () => [
+                        'Garantia minima de 36 meses on-site do fabricante',
+                        'Suporte tecnico 24x7 em portugues',
+                        'Tempo de atendimento maximo de 4 horas',
+                        'Manual e drivers disponiveis no site do fabricante'
+                    ]}
+                }
+            },
+            'storage': {
+                title: 'STORAGE DE REDE (SAN/NAS)',
+                sections: {
+                    'CAPACIDADE E DISCOS': { default: 5, items: () => [
+                        'Possuir capacidade util minima de 20 TB apos RAID',
+                        'Suportar discos SSD, SAS e NL-SAS no mesmo chassi',
+                        'Possuir capacidade de expansao para no minimo 200 TB',
+                        'Suportar troca a quente (hot-swap) de discos',
+                        'Possuir no minimo 2 discos hot-spare globais'
+                    ]},
+                    'CONTROLADORAS': { default: 4, items: () => [
+                        'Possuir 2 controladoras redundantes Active-Active',
+                        'Possuir cache total de no minimo 64 GB',
+                        'Suportar protecao de cache em caso de queda de energia',
+                        'Suportar failover automatico entre controladoras'
+                    ]},
+                    'CONECTIVIDADE': { default: 5, items: () => [
+                        'Possuir portas Fibre Channel de 16 ou 32 Gbps',
+                        'Possuir portas iSCSI de 10 Gbps',
+                        'Possuir portas Ethernet 10 Gbps para NAS',
+                        'Suportar NFS, SMB/CIFS e iSCSI simultaneos',
+                        'Suportar agregacao de links Ethernet'
+                    ]},
+                    'PROTECAO DE DADOS': { default: 6, items: () => [
+                        'Suportar RAID 1, 5, 6, 10 e Erasure Coding',
+                        'Suportar snapshots',
+                        'Suportar replicacao sincrona e assincrona',
+                        'Suportar deduplicacao e compressao em linha',
+                        'Suportar thin provisioning',
+                        'Suportar criptografia de dados em repouso'
+                    ]},
+                    'GERENCIAMENTO': { default: 4, items: () => [
+                        'Possuir interface web HTTPS',
+                        'Suportar SNMP, syslog e SMI-S',
+                        'Possuir CLI para gerenciamento avancado',
+                        'Suportar relatorios de performance e utilizacao'
+                    ]},
+                    'GARANTIA': { default: 4, items: () => [
+                        'Garantia minima de 36 meses on-site',
+                        'Suporte tecnico 24x7 em portugues',
+                        'Tempo de resposta maximo de 4 horas',
+                        'Atualizacoes de firmware gratuitas durante a garantia'
+                    ]}
+                }
+            },
+            'ups': {
+                title: 'NOBREAK (UPS) DE DUPLA CONVERSAO ON-LINE',
+                sections: {
+                    'CARACTERISTICAS DE ENTRADA': { default: 6, items: () => [
+                        'Possuir tensao de entrada nominal de 220 VAC, faixa de 176 a 264 VAC',
+                        'Possuir frequencia de entrada nominal de 50 ou 60 Hz, faixa de 45 a 65 Hz',
+                        'Possuir fator de potencia de entrada minimo de 0,99',
+                        'Possuir distorcao harmonica de corrente (THDi) inferior a 5 por cento',
+                        'Possuir protecao contra surtos conforme IEC 61643',
+                        'Suportar partida a frio (cold start) sem rede eletrica'
+                    ]},
+                    'CARACTERISTICAS DE SAIDA': { default: 6, items: () => [
+                        'Possuir tensao de saida regulada em 220 VAC com tolerancia de mais ou menos 1 por cento',
+                        'Possuir frequencia de saida de 60 Hz com tolerancia de mais ou menos 0,1 por cento',
+                        'Possuir distorcao harmonica de tensao (THDv) inferior a 3 por cento com carga linear',
+                        'Possuir fator de potencia de saida minimo de 0,9',
+                        'Possuir forma de onda senoidal pura',
+                        'Suportar sobrecarga de 125 por cento por 1 minuto e 150 por cento por 30 segundos'
+                    ]},
+                    'TOPOLOGIA E EFICIENCIA': { default: 4, items: () => [
+                        'Possuir topologia online de dupla conversao conforme IEC 62040-3 (VFI-SS-111)',
+                        'Possuir eficiencia minima de 94 por cento em modo online',
+                        'Possuir modo ECO com eficiencia minima de 98 por cento',
+                        'Suportar bypass automatico e manual'
+                    ]},
+                    'BATERIAS E AUTONOMIA': { default: 6, items: () => [
+                        'Possuir baterias seladas tipo VRLA-AGM ou de litio-ion',
+                        'Possuir autonomia minima de 15 minutos com 100 por cento de carga nominal',
+                        'Suportar expansao de autonomia via modulos adicionais',
+                        'Possuir carregamento inteligente com compensacao de temperatura',
+                        'Possuir teste automatico periodico das baterias',
+                        'Possuir alarme de fim de vida util das baterias'
+                    ]},
+                    'PROTECOES': { default: 5, items: () => [
+                        'Possuir protecao contra sobrecarga',
+                        'Possuir protecao contra curto-circuito na saida',
+                        'Possuir protecao contra descarga profunda das baterias',
+                        'Possuir protecao contra superaquecimento',
+                        'Possuir protecao contra inversao de polaridade na bateria'
+                    ]},
+                    'INTERFACES E COMUNICACAO': { default: 6, items: () => [
+                        'Possuir display LCD com tensao, corrente, frequencia, carga e nivel de bateria',
+                        'Possuir porta de comunicacao USB',
+                        'Possuir porta de comunicacao serial RS-232',
+                        'Possuir slot para placa SNMP/Web para gerenciamento via rede',
+                        'Possuir contatos secos para sinalizacao de alarmes',
+                        'Suportar shutdown automatico de servidores via software'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 6, items: () => [
+                        'Possuir formato rack 19 polegadas (rackmount) ou torre',
+                        'Possuir conectores de entrada e saida adequados (NEMA, IEC ou padrao brasileiro)',
+                        'Operar em temperatura ambiente de 0 a 40 graus Celsius',
+                        'Operar em umidade relativa de 0 a 95 por cento sem condensacao',
+                        'Possuir certificacao do INMETRO conforme Portaria 170/2012',
+                        'Possuir nivel de ruido inferior a 55 dB a 1 metro'
+                    ]},
+                    'GARANTIA': { default: 4, items: () => [
+                        'Garantia minima de 24 meses para o equipamento',
+                        'Garantia minima de 12 meses para as baterias',
+                        'Suporte tecnico em portugues durante a garantia',
+                        'Manual de operacao em portugues'
+                    ]}
+                }
+            },
+            'camera': {
+                title: 'CAMERA IP DE VIDEOMONITORAMENTO',
+                sections: {
+                    'SENSOR DE IMAGEM': { default: 6, items: () => [
+                        'Possuir sensor CMOS de no minimo 1/2.8 polegada',
+                        'Possuir resolucao minima de 4 megapixels (2688 x 1520 pixels)',
+                        'Suportar taxa de quadros minima de 30 fps em resolucao maxima',
+                        'Possuir sensibilidade minima de 0,005 lux em modo colorido',
+                        'Possuir sensibilidade de 0 lux com infravermelho ativo',
+                        'Suportar WDR (Wide Dynamic Range) com no minimo 120 dB'
+                    ]},
+                    'OPTICA E INFRAVERMELHO': { default: 4, items: () => [
+                        'Possuir lente varifocal motorizada com zoom optico minimo de 3x',
+                        'Possuir foco automatico (auto-focus)',
+                        'Possuir iluminacao infravermelha com alcance minimo de 30 metros',
+                        'Possuir filtro de corte de infravermelho mecanico (ICR)'
+                    ]},
+                    'COMPRESSAO E STREAMING': { default: 5, items: () => [
+                        'Suportar compressao H.265, H.265+, H.264 e MJPEG',
+                        'Suportar transmissao de no minimo 3 streams independentes',
+                        'Suportar audio bidirecional com codecs G.711 e AAC',
+                        'Suportar protocolos RTSP, RTP, RTCP, HTTP e HTTPS',
+                        'Suportar ONVIF Profile S, G e T'
+                    ]},
+                    'ANALITICOS DE VIDEO': { default: 6, items: () => [
+                        'Possuir deteccao de movimento por video',
+                        'Possuir deteccao de cruzamento de linha',
+                        'Possuir deteccao de intrusao em area',
+                        'Possuir deteccao de objeto abandonado e removido',
+                        'Suportar contagem de pessoas',
+                        'Suportar deteccao facial'
+                    ]},
+                    'REDE E ALIMENTACAO': { default: 5, items: () => [
+                        'Possuir interface Ethernet 10/100 Mbps RJ-45',
+                        'Suportar PoE conforme IEEE 802.3af',
+                        'Suportar alimentacao auxiliar 12 VDC',
+                        'Suportar slot para cartao MicroSD de no minimo 256 GB',
+                        'Suportar protocolos IPv4 e IPv6'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 5, items: () => [
+                        'Possuir grau de protecao minimo IP67',
+                        'Possuir grau de protecao IK10 contra vandalismo',
+                        'Operar em temperatura de menos 30 a 60 graus Celsius',
+                        'Possuir homologacao Anatel',
+                        'Acompanhar kit de fixacao e documentacao'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 36 meses do fabricante',
+                        'Suporte tecnico em portugues',
+                        'Manual em portugues ou ingles'
+                    ]}
+                }
+            },
+            'dvr-nvr': {
+                title: 'GRAVADOR DIGITAL DE VIDEO EM REDE (NVR)',
+                sections: {
+                    'CAPACIDADE DE GRAVACAO': { default: 5, items: () => [
+                        'Suportar no minimo 16 canais de video IP simultaneos',
+                        'Suportar resolucao maxima por canal de no minimo 8 megapixels (4K)',
+                        'Suportar taxa de bits de entrada total de no minimo 200 Mbps',
+                        'Suportar taxa de gravacao de 30 fps em todos os canais',
+                        'Suportar codecs H.265, H.265+, H.264 e H.264+'
+                    ]},
+                    'ARMAZENAMENTO': { default: 4, items: () => [
+                        'Possuir no minimo 4 baias para HDDs SATA 3.5 polegadas',
+                        'Suportar HDDs de no minimo 10 TB cada',
+                        'Suportar configuracoes RAID 0, 1, 5, 6 e 10',
+                        'Suportar troca a quente (hot-swap) de discos'
+                    ]},
+                    'CONECTIVIDADE': { default: 5, items: () => [
+                        'Possuir no minimo 2 portas Gigabit Ethernet RJ-45',
+                        'Possuir no minimo 16 portas PoE integradas (IEEE 802.3af/at)',
+                        'Possuir saidas de video HDMI e VGA simultaneas',
+                        'Possuir no minimo 4 portas USB para backup',
+                        'Possuir entradas e saidas de alarme'
+                    ]},
+                    'FUNCIONALIDADES': { default: 7, items: () => [
+                        'Suportar gravacao continua, por evento e agendada',
+                        'Suportar busca por horario, evento e analitico',
+                        'Suportar exportacao em formatos padrao (MP4, AVI)',
+                        'Suportar visualizacao remota via aplicativo movel',
+                        'Suportar acesso via navegador web HTTPS',
+                        'Suportar protocolo ONVIF para integracao com cameras de outros fabricantes',
+                        'Suportar reconhecimento facial e leitura de placas (LPR)'
+                    ]},
+                    'CARACTERISTICAS FISICAS': { default: 4, items: () => [
+                        'Possuir formato rack 19 polegadas',
+                        'Possuir fonte interna bivolt automatica',
+                        'Operar em 0 a 45 graus Celsius',
+                        'Possuir homologacao Anatel'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 36 meses do fabricante',
+                        'Suporte tecnico em portugues',
+                        'Atualizacoes de firmware gratuitas'
+                    ]}
+                }
+            },
+            'rack': {
+                title: 'RACK PARA EQUIPAMENTOS DE TI',
+                sections: {
+                    'CARACTERISTICAS DIMENSIONAIS': { default: 5, items: () => [
+                        'Possuir padrao de montagem de 19 polegadas conforme EIA-310-D',
+                        'Possuir altura util de no minimo 42U',
+                        'Possuir profundidade externa minima de 1000 mm',
+                        'Possuir largura externa de 600 mm',
+                        'Possuir profundidade util ajustavel'
+                    ]},
+                    'ESTRUTURA E MATERIAL': { default: 5, items: () => [
+                        'Ser construido em chapa de aco SAE 1020 com espessura minima de 1,5 mm',
+                        'Possuir tratamento com pintura epoxi-poliester texturizada na cor preta',
+                        'Possuir capacidade de carga estatica minima de 800 kg',
+                        'Possuir base reforcada com pes niveladores e rodizios',
+                        'Possuir colunas em perfil U com furacao quadrada para porcas tipo gaiola'
+                    ]},
+                    'PORTAS E LATERAIS': { default: 4, items: () => [
+                        'Possuir porta frontal com vidro temperado ou tela perfurada com taxa de ventilacao minima de 65 por cento',
+                        'Possuir porta traseira em chapa perfurada para ventilacao',
+                        'Possuir laterais removiveis com fechaduras',
+                        'Possuir fechaduras com chaves nas portas e laterais'
+                    ]},
+                    'VENTILACAO E ORGANIZACAO': { default: 5, items: () => [
+                        'Possuir teto com aberturas para ventiladores',
+                        'Acompanhar no minimo 4 ventiladores para teto com fluxo minimo de 100 CFM cada',
+                        'Acompanhar no minimo 4 organizadores horizontais de cabos',
+                        'Possuir guias verticais de cabos nas laterais internas',
+                        'Acompanhar no minimo 50 porcas tipo gaiola e parafusos M6'
+                    ]},
+                    'ATERRAMENTO': { default: 3, items: () => [
+                        'Possuir barramento de aterramento em cobre conectado a estrutura',
+                        'Acompanhar cabos de aterramento para portas e laterais',
+                        'Possuir conector de aterramento padrao para conexao a malha do edificio'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 12 meses contra defeitos de fabricacao',
+                        'Manual de montagem em portugues',
+                        'Acompanhar todos os acessorios necessarios para montagem'
+                    ]}
+                }
+            },
+            'cable-utp': {
+                title: 'CABO DE PAR TRANCADO (UTP) CATEGORIA 6',
+                sections: {
+                    'NORMAS APLICAVEIS': { default: 5, items: () => [
+                        'Atender categoria 6 conforme ANSI/TIA-568.2-D',
+                        'Atender ISO/IEC 11801 categoria 6 (Classe E)',
+                        'Atender ABNT NBR 14705',
+                        'Possuir certificacao Anatel',
+                        'Possuir certificacao UL Listed ou ETL Verified'
+                    ]},
+                    'CONSTRUCAO': { default: 6, items: () => [
+                        'Possuir 4 pares trancados de condutores de cobre solido',
+                        'Possuir condutores com bitola minima de 23 AWG',
+                        'Possuir isolacao individual em polietileno',
+                        'Possuir separador (cross-filler) entre os pares para reducao de diafonia',
+                        'Possuir capa externa em PVC retardante a chama tipo CM ou CMR',
+                        'Possuir cordao de rasgo (ripcord)'
+                    ]},
+                    'CARACTERISTICAS ELETRICAS': { default: 5, items: () => [
+                        'Possuir impedancia de 100 ohms mais ou menos 15 ohms',
+                        'Possuir resistencia DC maxima de 9,38 ohms por 100 metros',
+                        'Possuir capacitancia mutua maxima de 5,6 nF por 100 metros',
+                        'Suportar largura de banda minima de 250 MHz',
+                        'Suportar 1000Base-T e 10GBase-T em distancias curtas'
+                    ]},
+                    'CARACTERISTICAS MECANICAS': { default: 4, items: () => [
+                        'Possuir diametro externo entre 5,5 e 6,5 mm',
+                        'Suportar raio minimo de curvatura de 4 vezes o diametro externo',
+                        'Suportar tracao maxima de instalacao de 110 N (25 lbf)',
+                        'Operar em temperatura de menos 20 a 60 graus Celsius'
+                    ]},
+                    'EMBALAGEM E IDENTIFICACAO': { default: 4, items: () => [
+                        'Ser fornecido em caixa easy-pull com 305 metros (1000 pes)',
+                        'Possuir marcacao metrica decrescente a cada 60 cm na capa',
+                        'Possuir identificacao do fabricante, categoria e norma na capa',
+                        'Possuir cor da capa especificada conforme aplicacao'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 25 anos do fabricante quando instalado por profissional certificado',
+                        'Garantia de desempenho do canal (channel warranty)',
+                        'Acompanhar laudo tecnico de testes do fabricante'
+                    ]}
+                }
+            },
+            'cable-fiber': {
+                title: 'CABO DE FIBRA OPTICA',
+                sections: {
+                    'TIPO E APLICACAO': { default: 4, items: () => [
+                        'Ser do tipo monomodo conforme ITU-T G.652.D',
+                        'Possuir construcao para instalacao externa aerea autossustentada (ADSS) ou subterranea',
+                        'Atender ABNT NBR 14160',
+                        'Possuir certificacao Anatel'
+                    ]},
+                    'QUANTIDADE DE FIBRAS': { default: 2, items: () => [
+                        'Possuir no minimo 12 fibras opticas',
+                        'Possuir fibras agrupadas em unidades basicas com identificacao por cor conforme norma'
+                    ]},
+                    'CARACTERISTICAS OPTICAS': { default: 4, items: () => [
+                        'Possuir atenuacao maxima de 0,36 dB/km em 1310 nm',
+                        'Possuir atenuacao maxima de 0,22 dB/km em 1550 nm',
+                        'Possuir dispersao cromatica maxima de 18 ps/(nm.km) em 1550 nm',
+                        'Possuir comprimento de onda de corte (cable cutoff) inferior a 1260 nm'
+                    ]},
+                    'CONSTRUCAO MECANICA': { default: 6, items: () => [
+                        'Possuir nucleo com tubos loose tube preenchidos com gel hidrofobo',
+                        'Possuir elemento central dieletrico (FRP)',
+                        'Possuir elementos de tracao em aramida (Kevlar) ou fibra de vidro',
+                        'Possuir capa externa em polietileno preto resistente a UV',
+                        'Suportar tracao maxima de instalacao de no minimo 2700 N',
+                        'Suportar esmagamento minimo de 4000 N por 100 mm'
+                    ]},
+                    'CARACTERISTICAS AMBIENTAIS': { default: 3, items: () => [
+                        'Operar em temperatura de menos 40 a 70 graus Celsius',
+                        'Possuir resistencia a raios UV',
+                        'Possuir protecao contra penetracao de agua longitudinal'
+                    ]},
+                    'IDENTIFICACAO E EMBALAGEM': { default: 3, items: () => [
+                        'Possuir marcacao metrica sequencial na capa',
+                        'Possuir identificacao do fabricante, tipo de fibra e quantidade na capa',
+                        'Ser fornecido em bobinas com metragem especificada'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 25 anos do fabricante',
+                        'Acompanhar laudo tecnico de fabricacao com medicoes opticas',
+                        'Manual de instalacao em portugues'
+                    ]}
+                }
+            },
+            'conduit': {
+                title: 'ELETRODUTO RIGIDO DE ACO GALVANIZADO',
+                sections: {
+                    'NORMAS APLICAVEIS': { default: 4, items: () => [
+                        'Atender ABNT NBR 5597 - Eletroduto rigido de aco-carbono com revestimento protetor',
+                        'Atender ABNT NBR 5598 - Eletroduto rigido de aco-carbono e acessorios com rosca',
+                        'Atender ABNT NBR 13057 - Eletrodutos de aco - Requisitos',
+                        'Possuir certificacao do INMETRO quando aplicavel'
+                    ]},
+                    'MATERIAL E REVESTIMENTO': { default: 5, items: () => [
+                        'Ser fabricado em chapa de aco-carbono SAE 1010 ou 1020',
+                        'Possuir revestimento de zinco aplicado pelo processo de galvanizacao a fogo (hot-dip)',
+                        'Possuir camada de zinco com massa minima de 350 g/m2 (galvanizacao classe pesada)',
+                        'Possuir revestimento interno e externo uniforme sem falhas',
+                        'Possuir resistencia a corrosao adequada para ambiente externo'
+                    ]},
+                    'DIMENSOES E TOLERANCIAS': { default: 5, items: () => [
+                        'Possuir diametro nominal conforme especificacao do projeto (1/2, 3/4, 1, 1.1/4, 1.1/2, 2 polegadas, etc.)',
+                        'Possuir espessura de parede minima conforme tabela 1 da ABNT NBR 5597',
+                        'Possuir comprimento padrao de 3 metros por barra',
+                        'Possuir tolerancia dimensional conforme norma',
+                        'Possuir extremidades roscadas tipo NPT ou BSP'
+                    ]},
+                    'CARACTERISTICAS MECANICAS': { default: 4, items: () => [
+                        'Possuir resistencia mecanica adequada para instalacoes aparentes ou embutidas',
+                        'Suportar carga de impacto conforme requisitos da norma',
+                        'Possuir superficie interna lisa para passagem dos condutores',
+                        'Possuir extremidades sem rebarbas que danifiquem a isolacao dos condutores'
+                    ]},
+                    'IDENTIFICACAO': { default: 3, items: () => [
+                        'Possuir marcacao indelevel na superficie externa com identificacao do fabricante',
+                        'Possuir indicacao do diametro nominal e da norma de fabricacao',
+                        'Possuir indicacao do tipo de revestimento (galvanizado a fogo)'
+                    ]},
+                    'ACESSORIOS': { default: 4, items: () => [
+                        'Acompanhar luvas de emenda quando solicitadas',
+                        'Acompanhar curvas pre-fabricadas (90 graus, 45 graus) quando solicitadas',
+                        'Acompanhar buchas e arruelas para fixacao em caixas e quadros',
+                        'Todos os acessorios devem possuir o mesmo tipo de revestimento do eletroduto'
+                    ]}
+                }
+            },
+            'cable-electric': {
+                title: 'CABO ELETRICO DE BAIXA TENSAO',
+                sections: {
+                    'NORMAS APLICAVEIS': { default: 4, items: () => [
+                        'Atender ABNT NBR 7288 - Cabos de potencia com isolacao solida extrudada',
+                        'Atender ABNT NBR NM 247-3 - Cabos isolados com PVC para tensoes ate 450/750 V',
+                        'Atender ABNT NBR 13248 - Cabos de potencia e controle nao propagantes de chama',
+                        'Possuir certificacao do INMETRO conforme Portaria 184/2014'
+                    ]},
+                    'CONSTRUCAO': { default: 6, items: () => [
+                        'Possuir condutor em cobre eletrolitico recozido, classe de encordoamento 5 (flexivel)',
+                        'Possuir secao nominal conforme especificacao do projeto',
+                        'Possuir isolacao em polietileno reticulado (XLPE) ou PVC antichama',
+                        'Possuir cobertura externa em PVC ou composto nao halogenado (LSZH)',
+                        'Possuir identificacao das veias por cores conforme norma',
+                        'Possuir numero de veias conforme aplicacao (unipolar ate pentapolar)'
+                    ]},
+                    'CARACTERISTICAS ELETRICAS': { default: 5, items: () => [
+                        'Possuir tensao de isolamento de 0,6/1 kV ou 750 V conforme aplicacao',
+                        'Possuir resistencia eletrica do condutor conforme ABNT NBR NM 280',
+                        'Possuir capacidade de conducao de corrente conforme NBR 5410',
+                        'Suportar temperatura no condutor de 90 graus Celsius em regime permanente para XLPE',
+                        'Suportar temperatura no condutor de 70 graus Celsius em regime permanente para PVC'
+                    ]},
+                    'COMPORTAMENTO AO FOGO': { default: 4, items: () => [
+                        'Ser nao propagante de chama conforme ABNT NBR 6812',
+                        'Possuir baixa emissao de fumaca quando em LSZH',
+                        'Possuir baixa toxicidade dos gases de combustao',
+                        'Atender ensaios de chama conforme classe BF'
+                    ]},
+                    'IDENTIFICACAO E EMBALAGEM': { default: 4, items: () => [
+                        'Possuir marcacao indelevel na superficie externa com identificacao do fabricante',
+                        'Possuir indicacao da secao nominal, tensao de isolamento e norma',
+                        'Possuir marcacao metrica sequencial a cada metro',
+                        'Ser fornecido em bobinas ou rolos com metragem especificada'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 12 meses contra defeitos de fabricacao',
+                        'Acompanhar certificado de ensaios de fabricacao',
+                        'Possuir laudo de conformidade com normas aplicaveis'
+                    ]}
+                }
+            },
+            'circuit-breaker': {
+                title: 'DISJUNTOR TERMOMAGNETICO',
+                sections: {
+                    'NORMAS APLICAVEIS': { default: 3, items: () => [
+                        'Atender ABNT NBR IEC 60898-1 para disjuntores de uso residencial',
+                        'Atender ABNT NBR IEC 60947-2 para disjuntores de uso industrial',
+                        'Possuir certificacao do INMETRO conforme Portaria 311/2008'
+                    ]},
+                    'CARACTERISTICAS ELETRICAS': { default: 6, items: () => [
+                        'Possuir tensao nominal de 230/400 VCA',
+                        'Possuir frequencia nominal de 50/60 Hz',
+                        'Possuir corrente nominal conforme especificacao do projeto (10A, 16A, 20A, 25A, 32A, 40A, 50A, 63A, etc.)',
+                        'Possuir capacidade de interrupcao minima de 5 kA conforme NBR IEC 60898-1',
+                        'Possuir curva de disparo tipo C (padrao residencial e comercial) ou tipo B/D conforme aplicacao',
+                        'Possuir numero de polos conforme especificacao (monopolar, bipolar, tripolar, tetrapolar)'
+                    ]},
+                    'PROTECOES': { default: 4, items: () => [
+                        'Possuir disparador termico para protecao contra sobrecargas',
+                        'Possuir disparador magnetico para protecao contra curto-circuito',
+                        'Possuir mecanismo de disparo livre (trip-free)',
+                        'Suportar acoplamento de disparadores adicionais (shunt trip, undervoltage release)'
+                    ]},
+                    'CONSTRUCAO': { default: 5, items: () => [
+                        'Possuir invocrito termoplastico autoextinguivel',
+                        'Possuir contatos de prata para alta condutividade e durabilidade',
+                        'Possuir terminais com parafusos para fixacao de condutores',
+                        'Possuir fixacao por engate rapido em trilho DIN 35 mm',
+                        'Possuir grau de protecao minimo IP20'
+                    ]},
+                    'INDICACAO E ACIONAMENTO': { default: 3, items: () => [
+                        'Possuir alavanca com indicacao visual de estado (LIGADO/DESLIGADO/DISPARADO)',
+                        'Possuir indicacao clara das posicoes na alavanca',
+                        'Suportar lacre de seguranca'
+                    ]},
+                    'CARACTERISTICAS AMBIENTAIS': { default: 3, items: () => [
+                        'Operar em temperatura ambiente de menos 25 a 55 graus Celsius',
+                        'Operar em altitude de ate 2000 metros sem alteracao de caracteristicas',
+                        'Suportar umidade relativa de ate 95 por cento'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 24 meses do fabricante',
+                        'Manual de instalacao em portugues',
+                        'Selo de conformidade INMETRO visivel'
+                    ]}
+                }
+            },
+            'panel': {
+                title: 'QUADRO ELETRICO DE DISTRIBUICAO',
+                sections: {
+                    'NORMAS APLICAVEIS': { default: 3, items: () => [
+                        'Atender ABNT NBR IEC 61439-1 e 61439-3',
+                        'Atender ABNT NBR 5410 - Instalacoes eletricas de baixa tensao',
+                        'Possuir certificacao do INMETRO quando aplicavel'
+                    ]},
+                    'CARACTERISTICAS ELETRICAS': { default: 5, items: () => [
+                        'Possuir tensao nominal de 230/400 VCA',
+                        'Possuir corrente nominal conforme especificacao do projeto',
+                        'Possuir capacidade de curto-circuito conforme calculo do projeto',
+                        'Possuir frequencia nominal de 50/60 Hz',
+                        'Possuir grau de poluicao 3 conforme norma'
+                    ]},
+                    'CONSTRUCAO': { default: 6, items: () => [
+                        'Ser construido em chapa de aco SAE 1020 com espessura minima de 1,2 mm',
+                        'Possuir tratamento com pintura epoxi-poliester eletrostatica',
+                        'Possuir cor padrao bege RAL 7032 ou conforme especificacao',
+                        'Possuir porta com fechadura tipo Yale e dobradicas internas',
+                        'Possuir placa de montagem removivel para fixacao dos componentes',
+                        'Possuir grau de protecao minimo IP54 (interno) ou IP65 (externo)'
+                    ]},
+                    'COMPONENTES INTERNOS': { default: 6, items: () => [
+                        'Possuir trilhos DIN 35 mm para fixacao de disjuntores e contatores',
+                        'Possuir barramento de fase em cobre eletrolitico dimensionado para a corrente nominal',
+                        'Possuir barramento de neutro com furacoes para conexao dos cabos',
+                        'Possuir barramento de aterramento (PE) com furacoes',
+                        'Possuir canaletas plasticas perfuradas para organizacao da fiacao',
+                        'Possuir borneiras de passagem para conexao de cabos externos quando aplicavel'
+                    ]},
+                    'IDENTIFICACAO': { default: 4, items: () => [
+                        'Possuir placa de identificacao do quadro com dados eletricos',
+                        'Possuir identificacao individual dos circuitos por etiquetas indeleveis',
+                        'Possuir sinalizacao de presenca de tensao por leds ou lampadas',
+                        'Possuir diagrama unifilar afixado na contraporta do quadro'
+                    ]},
+                    'CARACTERISTICAS DIMENSIONAIS': { default: 3, items: () => [
+                        'Possuir dimensoes adequadas para todos os componentes do projeto',
+                        'Possuir espaco reserva minimo de 30 por cento para futuras ampliacoes',
+                        'Possuir furacao para entrada de cabos com prensa-cabos'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 12 meses do fabricante',
+                        'Manual em portugues com diagrama unifilar e lista de componentes',
+                        'Acompanhar laudo de inspecao e ensaios de fabrica'
+                    ]}
+                }
+            },
+            'generator': {
+                title: 'GRUPO MOTOR-GERADOR DIESEL',
+                sections: {
+                    'CARACTERISTICAS GERAIS': { default: 4, items: () => [
+                        'Atender ABNT NBR ISO 8528 - Grupos geradores acionados por motor de combustao interna',
+                        'Possuir potencia nominal conforme especificacao do projeto (kVA em regime PRP)',
+                        'Possuir tensao nominal de 220/380 VCA, trifasico, 4 fios + terra',
+                        'Possuir frequencia nominal de 60 Hz com regulacao de mais ou menos 1 por cento'
+                    ]},
+                    'MOTOR DIESEL': { default: 6, items: () => [
+                        'Possuir motor diesel de 4 tempos com injecao direta',
+                        'Possuir refrigeracao a agua com radiador acoplado',
+                        'Possuir sistema de partida eletrica com bateria 12 ou 24 VCC',
+                        'Possuir filtros de oleo, combustivel e ar substituiveis',
+                        'Possuir alternador de carga das baterias com regulador',
+                        'Atender Norma de Emissoes IBAMA aplicavel'
+                    ]},
+                    'GERADOR': { default: 5, items: () => [
+                        'Possuir alternador sincrono trifasico, sem escovas (brushless)',
+                        'Possuir excitatriz com regulador automatico de tensao (AVR)',
+                        'Possuir grau de protecao minimo IP23',
+                        'Possuir classe de isolamento minima H',
+                        'Possuir regulacao de tensao de mais ou menos 1 por cento em regime permanente'
+                    ]},
+                    'PAINEL DE CONTROLE': { default: 6, items: () => [
+                        'Possuir painel digital microprocessado com display LCD',
+                        'Possuir indicacao de tensao, corrente, frequencia, potencia, fator de potencia e horimetro',
+                        'Possuir indicacao de pressao de oleo, temperatura da agua e nivel de combustivel',
+                        'Possuir USCA (Unidade de Supervisao e Controle Automatico) para partida automatica',
+                        'Possuir interface de comunicacao (RS-485, Modbus, SNMP)',
+                        'Possuir protecoes para baixa pressao de oleo, alta temperatura, sobrevelocidade e sobrecarga'
+                    ]},
+                    'TANQUE DE COMBUSTIVEL': { default: 4, items: () => [
+                        'Possuir tanque com autonomia minima de 8 horas em regime nominal',
+                        'Possuir tanque integrado a base do grupo gerador (skid-tank) ou externo conforme projeto',
+                        'Possuir bacia de contencao conforme NBR 17505',
+                        'Possuir indicador de nivel e alarme de combustivel baixo'
+                    ]},
+                    'CARENAGEM E ATENUACAO ACUSTICA': { default: 4, items: () => [
+                        'Possuir carenagem metalica com pintura externa antimofo',
+                        'Possuir tratamento acustico interno com nivel de ruido maximo de 75 dB a 7 metros',
+                        'Possuir aberturas para entrada e saida de ar com protecao contra chuva',
+                        'Possuir portas de acesso para manutencao com fechaduras'
+                    ]},
+                    'GARANTIA E SERVICOS': { default: 5, items: () => [
+                        'Garantia minima de 24 meses ou 1500 horas de funcionamento',
+                        'Suporte tecnico e pecas de reposicao em territorio nacional',
+                        'Treinamento de operacao e manutencao basica',
+                        'Manual de operacao e manutencao em portugues',
+                        'Acompanhar laudo de testes de fabrica'
+                    ]}
+                }
+            },
+            'solar-panel': {
+                title: 'MODULO FOTOVOLTAICO',
+                sections: {
+                    'NORMAS APLICAVEIS': { default: 4, items: () => [
+                        'Atender IEC 61215 - Qualificacao do projeto e homologacao',
+                        'Atender IEC 61730 - Qualificacao para seguranca de modulos fotovoltaicos',
+                        'Possuir certificacao do INMETRO conforme Portaria 357/2014',
+                        'Atender ABNT NBR 16690 - Instalacoes eletricas de arranjos fotovoltaicos'
+                    ]},
+                    'CARACTERISTICAS ELETRICAS (STC)': { default: 6, items: () => [
+                        'Possuir potencia nominal minima de 550 Wp em condicoes padrao de teste (STC)',
+                        'Possuir tensao de circuito aberto (Voc) compativel com o sistema',
+                        'Possuir corrente de curto-circuito (Isc) compativel com o sistema',
+                        'Possuir tensao de maxima potencia (Vmp) e corrente de maxima potencia (Imp) especificadas',
+                        'Possuir eficiencia minima do modulo de 21 por cento',
+                        'Possuir tolerancia de potencia positiva de 0 a mais 5 W'
+                    ]},
+                    'CONSTRUCAO': { default: 6, items: () => [
+                        'Possuir celulas de silicio monocristalino tipo PERC, TOPCon ou similar',
+                        'Possuir tecnologia half-cell para reducao de perdas',
+                        'Possuir vidro frontal temperado de baixo teor de ferro com espessura minima de 3,2 mm',
+                        'Possuir moldura em aluminio anodizado com furacao para fixacao',
+                        'Possuir caixa de juncao com grau de protecao minimo IP67',
+                        'Possuir cabos de saida com conectores tipo MC4 ou similar'
+                    ]},
+                    'CARACTERISTICAS TERMICAS': { default: 4, items: () => [
+                        'Possuir coeficiente de temperatura de potencia maximo de menos 0,35 por cento por grau Celsius',
+                        'Operar em temperatura de menos 40 a 85 graus Celsius',
+                        'Possuir NOCT (Nominal Operating Cell Temperature) maximo de 45 graus Celsius',
+                        'Suportar carga de neve de no minimo 5400 Pa e carga de vento de 2400 Pa'
+                    ]},
+                    'GARANTIAS DO FABRICANTE': { default: 4, items: () => [
+                        'Garantia de produto (defeitos de fabricacao) de no minimo 12 anos',
+                        'Garantia linear de potencia de no minimo 25 anos com perda maxima de 0,5 por cento ao ano',
+                        'Garantia de potencia minima de 84 por cento da nominal apos 25 anos',
+                        'Acompanhar certificados de ensaios e datasheet'
+                    ]}
+                }
+            },
+            'other': {
+                title: 'EQUIPAMENTO',
+                sections: {
+                    'CARACTERISTICAS GERAIS': { default: 5, items: () => [
+                        'Atender as normas tecnicas brasileiras (ABNT) aplicaveis ao produto',
+                        'Possuir certificacoes pertinentes (INMETRO, Anatel, etc.)',
+                        'Ser novo, de primeiro uso, sem indicios de utilizacao previa',
+                        'Possuir embalagem original do fabricante em condicoes integras',
+                        'Acompanhar manual em lingua portuguesa'
+                    ]},
+                    'ESPECIFICACOES TECNICAS': { default: 5, items: () => [
+                        'Atender as especificacoes tecnicas detalhadas no projeto basico',
+                        'Atender requisitos de desempenho conforme normas aplicaveis',
+                        'Possuir caracteristicas dimensionais conforme especificado',
+                        'Possuir caracteristicas eletricas/mecanicas conforme especificado',
+                        'Possuir condicoes ambientais de operacao adequadas a aplicacao'
+                    ]},
+                    'GARANTIA': { default: 3, items: () => [
+                        'Garantia minima de 12 meses contra defeitos de fabricacao',
+                        'Suporte tecnico em portugues',
+                        'Disponibilidade de pecas de reposicao em territorio nacional'
+                    ]}
+                }
+            }
+        };
+
+        // ============================================================
+        // FUNCOES DE CONFIGURACAO DA UI
+        // ============================================================
+        function renderItemsConfig(category) {
+            const container = document.getElementById('itemsConfigContainer');
+            const template = CATEGORY_TEMPLATES[category] || CATEGORY_TEMPLATES['other'];
+            container.innerHTML = '';
+            
+            Object.entries(template.sections).forEach(([sectionName, sectionData]) => {
+                const row = document.createElement('div');
+                row.className = 'item-config-row';
+                const maxItems = sectionData.items({}).length;
+                const labelShort = sectionName.length > 20 ? sectionName.substring(0, 18) + '...' : sectionName;
+                row.innerHTML = '<span class="item-config-label" title="' + sectionName + '">' + labelShort + '</span>' +
+                    '<input type="number" class="item-config-input" data-section="' + sectionName + '" value="' + sectionData.default + '" min="1" max="' + maxItems + '">';
+                container.appendChild(row);
+            });
+        }
+
         categoryBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 categoryBtns.forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
                 selectedCategory = btn.dataset.category;
+                renderItemsConfig(selectedCategory);
             });
         });
+
+        renderItemsConfig(selectedCategory);
 
         fileUploadArea.addEventListener('click', () => fileInput.click());
         fileUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); fileUploadArea.classList.add('dragover'); });
@@ -274,7 +1233,7 @@
         fileRemove.addEventListener('click', (e) => { e.stopPropagation(); fileInput.value = ''; fileInfo.style.display = 'none'; fileUploadArea.classList.remove('has-file'); });
 
         async function handleFile(file) {
-            if (file.size > 10 * 1024 * 1024) { showToast('Arquivo muito grande. Máximo 10MB.', 'error'); return; }
+            if (file.size > 10 * 1024 * 1024) { showToast('Arquivo muito grande. Maximo 10MB.', 'error'); return; }
             fileName.textContent = file.name; fileInfo.style.display = 'flex'; fileUploadArea.classList.add('has-file');
             if (file.type === 'application/pdf') {
                 try {
@@ -286,14 +1245,14 @@
                         const content = await page.getTextContent();
                         text += content.items.map(item => item.str).join(' ') + '\n';
                     }
-                    if (text.trim()) { datasheetText.value = text.trim(); showToast('Texto extraído do PDF!', 'success'); }
+                    if (text.trim()) { datasheetText.value = text.trim(); showToast('Texto extraido do PDF!', 'success'); }
                 } catch (error) { showToast('Erro ao extrair texto do PDF.', 'error'); }
             } else if (file.type === 'text/plain') { datasheetText.value = await file.text(); showToast('Arquivo carregado!', 'success'); }
         }
 
         generateBtn.addEventListener('click', () => {
             const text = datasheetText.value.trim();
-            if (!text) { showToast('Insira o conteúdo do datasheet.', 'error'); return; }
+            if (!text) { showToast('Insira o conteudo do datasheet.', 'error'); return; }
             generateBtn.innerHTML = '<span class="spinner"></span>Processando...';
             generateBtn.disabled = true;
             setTimeout(() => {
@@ -302,227 +1261,126 @@
                 outputEmpty.style.display = 'none';
                 outputContent.classList.add('visible');
                 outputStatus.textContent = 'Gerado em ' + new Date().toLocaleTimeString('pt-BR');
-                generateBtn.innerHTML = 'Gerar Especificação Técnica';
+                generateBtn.innerHTML = 'Gerar Especificacao Tecnica';
                 generateBtn.disabled = false;
-                showToast('Especificação gerada!', 'success');
-            }, 1000);
+                showToast('Especificacao gerada!', 'success');
+            }, 800);
         });
 
         copyBtn.addEventListener('click', () => { if (generatedSpec) { navigator.clipboard.writeText(generatedSpec.plainText).then(() => { showToast('Texto copiado!', 'success'); }); } });
-        
         exportWordBtn.addEventListener('click', () => { if (generatedSpec) exportToWord(); });
-        
+        viewRawBtn.addEventListener('click', () => { if (generatedSpec) { rawText.textContent = generatedSpec.plainText; rawModal.classList.add('visible'); } });
+        modalClose.addEventListener('click', () => rawModal.classList.remove('visible'));
+        rawModal.addEventListener('click', (e) => { if (e.target === rawModal) rawModal.classList.remove('visible'); });
+
+        function showToast(message, type) { type = type || 'success'; toastMessage.textContent = message; toast.className = 'toast ' + type + ' visible'; setTimeout(() => toast.classList.remove('visible'), 3000); }
+
+        function analyzeDatasheet(raw, category) {
+            const data = {};
+            const l = raw.toLowerCase();
+            if (['switch', 'router'].includes(category)) {
+                let m = l.match(/(\d+)\s*[x×]?\s*(?:port|porta)?\s*(?:10\/100\/1000|1g|gigabit|gbe)/i) || l.match(/(\d+)\s*[x×]\s*(?:rj-?45)/i);
+                if (m) data.gigabitPorts = parseInt(m[1]);
+                m = l.match(/(\d+)\s*[x×]?\s*(?:port|porta)?\s*(?:sfp\+?|10g)/i);
+                if (m) data.sfpPorts = parseInt(m[1]);
+                if (l.includes('10g') || l.includes('sfp+')) data.sfpSpeed = '10 Gbps';
+                m = l.match(/(\d+)\s*w(?:atts?)?\s*(?:poe|budget)/i) || l.match(/poe\s*(?:budget|power)?\s*:?\s*(\d+)\s*w/i);
+                if (m) data.poeBudget = parseInt(m[1]);
+                m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:gbps|gb\/s)\s*(?:switching|capacity)/i) || l.match(/(?:switching|backplane)\s*(?:capacity)?\s*:?\s*(\d+(?:[.,]\d+)?)\s*(?:gbps)/i);
+                if (m) data.switchingCapacity = m[1].replace(',', '.') + ' Gbps';
+                m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:mpps)/i);
+                if (m) data.forwardingRate = m[1].replace(',', '.') + ' Mpps';
+                m = l.match(/(?:mac\s*(?:table|address))\s*:?\s*(\d+(?:[.,]\d+)?)\s*(k|mil)?/i) || l.match(/(\d+(?:[.,]\d+)?)\s*(k)?\s*(?:mac)/i);
+                if (m) { let v = parseFloat(m[1].replace(',', '.')); if (m[2] && m[2].toLowerCase() === 'k') v *= 1000; data.macTable = Math.round(v).toLocaleString('pt-BR'); }
+            }
+            return data;
+        }
+
+        function generateSpecification(content, category) {
+            const template = CATEGORY_TEMPLATES[category] || CATEGORY_TEMPLATES['other'];
+            const data = analyzeDatasheet(content, category);
+            const title = template.title;
+            
+            let html = '<div class="spec-section"><div class="spec-section-title">' + title + '</div></div>';
+            let plainText = title + '\n' + '='.repeat(title.length) + '\n\n';
+            
+            const inputs = document.querySelectorAll('#itemsConfigContainer .item-config-input');
+            const itemsCount = {};
+            inputs.forEach(input => { itemsCount[input.dataset.section] = parseInt(input.value) || 5; });
+            
+            let sectionNum = 1;
+            const letters = 'abcdefghijklmnopqrstuvwxyz';
+            
+            Object.entries(template.sections).forEach(([sectionName, sectionData]) => {
+                const items = sectionData.items(data);
+                const maxItems = itemsCount[sectionName] || sectionData.default;
+                const itemsToShow = items.slice(0, maxItems);
+                
+                html += '<div class="spec-section"><div class="spec-section-title">' + sectionNum + '. ' + sectionName + '</div>';
+                html += '<table class="spec-table"><tr><th style="width:50px">Item</th><th>Especificacao</th></tr>';
+                plainText += sectionNum + '. ' + sectionName + '\n' + '-'.repeat(40) + '\n';
+                
+                itemsToShow.forEach((item, idx) => {
+                    html += '<tr><td>' + letters[idx] + ')</td><td>' + item + '</td></tr>';
+                    plainText += letters[idx] + ') ' + item + '\n';
+                });
+                
+                html += '</table></div>';
+                plainText += '\n';
+                sectionNum++;
+            });
+            
+            html += '<div class="spec-notes"><div class="spec-notes-title">Observacoes para o Edital</div><div class="spec-notes-text">Especificacao generica conforme Lei 14.133/2021, sem direcionamento a fabricante especifico.</div></div>';
+            plainText += 'OBSERVACOES: Especificacao generica conforme Lei 14.133/2021.';
+            
+            return { html: html, plainText: plainText };
+        }
+
+        function getCategoryTitle(cat) {
+            const template = CATEGORY_TEMPLATES[cat] || CATEGORY_TEMPLATES['other'];
+            return template.title;
+        }
+
         function exportToWord() {
-            const title = getCategoryTitle(selectedCategory);
-            const portInfo = analyzePortsFromRaw(datasheetText.value);
-            const perfInfo = analyzePerformanceFromRaw(datasheetText.value);
+            const template = CATEGORY_TEMPLATES[selectedCategory] || CATEGORY_TEMPLATES['other'];
+            const data = analyzeDatasheet(datasheetText.value, selectedCategory);
+            const title = template.title;
             
-            const itemsConfig = {
-                interfaces: parseInt(document.getElementById('itemsInterfaces').value) || 6,
-                desempenho: parseInt(document.getElementById('itemsDesempenho').value) || 5,
-                camada2: parseInt(document.getElementById('itemsCamada2').value) || 9,
-                seguranca: parseInt(document.getElementById('itemsSeguranca').value) || 8,
-                gerenciamento: parseInt(document.getElementById('itemsGerenciamento').value) || 8,
-                fisico: parseInt(document.getElementById('itemsFisico').value) || 7,
-                garantia: parseInt(document.getElementById('itemsGarantia').value) || 4
-            };
-            
-            const allItems = {
-                interfaces: [
-                    portInfo.gigabitPorts ? 'Possuir no minimo ' + portInfo.gigabitPorts + ' portas Gigabit Ethernet 10/100/1000Base-T com conectores RJ-45' : 'Possuir portas Gigabit Ethernet 10/100/1000Base-T com conectores RJ-45',
-                    portInfo.sfpPorts ? 'Possuir no minimo ' + portInfo.sfpPorts + ' portas SFP/SFP+ para uplink com velocidade de ' + (portInfo.sfpSpeed || '10 Gbps') : 'Possuir portas SFP/SFP+ para uplink de alta velocidade',
-                    'Suportar Power over Ethernet (PoE/PoE+) compativel com os padroes IEEE 802.3af e IEEE 802.3at',
-                    portInfo.poeBudget ? 'Possuir orcamento PoE total de no minimo ' + portInfo.poeBudget + 'W' : 'Possuir orcamento PoE adequado a quantidade de portas',
-                    'Suportar auto-negociacao de velocidade e modo duplex em todas as portas',
-                    'Suportar deteccao automatica de cabo crossover (Auto MDI/MDI-X)',
-                    'Possuir todas as portas com capacidade de operacao simultanea em wire-speed',
-                    'Suportar Energy Efficient Ethernet (IEEE 802.3az) para economia de energia'
-                ],
-                desempenho: [
-                    'Possuir capacidade de switching de no minimo ' + (perfInfo.switchingCapacity || 'valor suficiente para operacao nao bloqueante'),
-                    perfInfo.forwardingRate ? 'Possuir taxa de encaminhamento de pacotes de no minimo ' + perfInfo.forwardingRate : 'Possuir taxa de encaminhamento adequada para operacao wire-speed',
-                    'Suportar tabela de enderecos MAC com no minimo ' + (perfInfo.macTable || '16.000') + ' entradas',
-                    'Possuir latencia inferior a 5 microssegundos para frames de 64 bytes',
-                    'Possuir memoria de buffer suficiente para operacao em alta demanda',
-                    'Suportar arquitetura store-and-forward para verificacao de integridade dos frames',
-                    'Possuir processador dedicado para operacoes de switching'
-                ],
-                camada2: [
-                    'Suportar no minimo 4.094 VLANs simultaneas conforme padrao IEEE 802.1Q',
-                    'Suportar protocolo Spanning Tree (STP) conforme IEEE 802.1D',
-                    'Suportar protocolo Rapid Spanning Tree (RSTP) conforme IEEE 802.1w',
-                    'Suportar protocolo Multiple Spanning Tree (MSTP) conforme IEEE 802.1s',
-                    'Suportar agregacao de links (Link Aggregation) conforme padrao IEEE 802.3ad (LACP)',
-                    'Suportar qualidade de servico (QoS) conforme IEEE 802.1p com no minimo 4 filas por porta',
-                    'Suportar IGMP Snooping nas versoes 1, 2 e 3',
-                    'Suportar protocolo LLDP (Link Layer Discovery Protocol) conforme IEEE 802.1AB',
-                    'Suportar Jumbo Frames de ate 9.216 bytes',
-                    'Suportar VLAN por porta, protocolo e MAC',
-                    'Suportar Guest VLAN e VLAN de voz'
-                ],
-                seguranca: [
-                    'Suportar autenticacao de usuarios conforme padrao IEEE 802.1X com integracao a servidores RADIUS',
-                    'Suportar listas de controle de acesso (ACLs) baseadas em informacoes de camada 2, 3 e 4',
-                    'Suportar limitacao de enderecos MAC por porta (Port Security)',
-                    'Possuir protecao contra MAC flooding',
-                    'Suportar DHCP Snooping para protecao contra servidores DHCP nao autorizados',
-                    'Suportar Dynamic ARP Inspection (DAI) para prevencao de ataques ARP spoofing',
-                    'Suportar controle de tempestade (Storm Control) para trafego broadcast, multicast e unicast',
-                    'Suportar isolamento de portas (Private VLAN ou similar)',
-                    'Suportar IP Source Guard para prevencao de IP spoofing',
-                    'Suportar autenticacao de usuarios via portal web (captive portal)'
-                ],
-                gerenciamento: [
-                    'Possuir interface de linha de comando (CLI) acessivel via porta console serial e conexao SSH versao 2',
-                    'Possuir interface grafica de gerenciamento via protocolo HTTPS com certificado SSL/TLS',
-                    'Suportar protocolo SNMP nas versoes 1, 2c e 3 com MIBs padrao',
-                    'Suportar envio de logs para servidor Syslog externo',
-                    'Suportar sincronizacao de relogio via protocolo NTP ou SNTP',
-                    'Suportar backup e restauracao de configuracao via protocolos TFTP ou SFTP',
-                    'Suportar atualizacao de firmware via interface web ou linha de comando',
-                    'Suportar espelhamento de portas (Port Mirroring) para analise de trafego',
-                    'Suportar multiplos niveis de acesso administrativo',
-                    'Suportar RMON para monitoramento remoto de estatisticas'
-                ],
-                fisico: [
-                    'Possuir formato adequado para instalacao em rack padrao de 19 polegadas, quando aplicavel',
-                    'Possuir fonte de alimentacao interna com selecao automatica de tensao (bivolt) operando na faixa de 100 a 240 VAC e frequencia de 50/60 Hz',
-                    'Operar em temperatura ambiente de 0 graus Celsius a 45 graus Celsius',
-                    'Operar em umidade relativa do ar de 10 por cento a 90 por cento, sem condensacao',
-                    'Possuir indicadores luminosos (LEDs) de status de funcionamento e atividade das portas',
-                    'Possuir homologacao da Anatel ou certificacoes equivalentes (CE, FCC)',
-                    'Acompanhar cabo de alimentacao, kit de montagem em rack quando aplicavel, e documentacao tecnica',
-                    'Possuir ventilacao adequada para operacao continua',
-                    'Possuir botao de reset fisico para restauracao de configuracao de fabrica'
-                ],
-                garantia: [
-                    'Possuir garantia do fabricante de no minimo 36 (trinta e seis) meses, contados a partir da data do recebimento definitivo do equipamento',
-                    'Disponibilizar suporte tecnico em lingua portuguesa, por telefone e/ou correio eletronico, durante o periodo de garantia',
-                    'Disponibilizar gratuitamente atualizacoes de firmware durante o periodo de garantia',
-                    'Fornecer manual tecnico completo em lingua portuguesa ou inglesa',
-                    'Disponibilizar base de conhecimento online para consulta de documentacao tecnica',
-                    'Oferecer substituicao de equipamento defeituoso em caso de falha coberta pela garantia'
-                ]
-            };
+            const inputs = document.querySelectorAll('#itemsConfigContainer .item-config-input');
+            const itemsCount = {};
+            inputs.forEach(input => { itemsCount[input.dataset.section] = parseInt(input.value) || 5; });
             
             let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>@page{margin:3cm 2cm 2cm 3cm}body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.5;text-align:justify}h1{font-size:14pt;font-weight:bold;text-align:center;text-transform:uppercase;margin-bottom:24pt}h2{font-size:12pt;font-weight:bold;margin-top:18pt;margin-bottom:12pt}p{text-indent:1.25cm;margin-bottom:12pt}ul{margin-left:1.25cm;margin-bottom:12pt;list-style-type:none}li{margin-bottom:6pt;text-align:justify}</style></head><body>';
             content += '<h1>ESPECIFICACAO TECNICA</h1>';
             content += '<h1>' + title + '</h1>';
             
-            function generateSection(sectionNum, sectionTitle, items, maxItems) {
-                let html = '<h2>' + sectionNum + ' ' + sectionTitle + '</h2><ul>';
-                const letters = 'abcdefghijklmnopqrstuvwxyz';
-                const itemsToUse = items.slice(0, maxItems);
-                itemsToUse.forEach((item, idx) => {
-                    html += '<li>' + letters[idx] + ') ' + item + ';</li>';
+            const letters = 'abcdefghijklmnopqrstuvwxyz';
+            let sectionNum = 1;
+            
+            Object.entries(template.sections).forEach(([sectionName, sectionData]) => {
+                const items = sectionData.items(data);
+                const maxItems = itemsCount[sectionName] || sectionData.default;
+                const itemsToShow = items.slice(0, maxItems);
+                
+                content += '<h2>' + sectionNum + ' ' + sectionName + '</h2><ul>';
+                itemsToShow.forEach((item, idx) => {
+                    content += '<li>' + letters[idx] + ') ' + item + ';</li>';
                 });
-                html += '</ul>';
-                return html;
-            }
+                content += '</ul>';
+                sectionNum++;
+            });
             
-            content += generateSection('1', 'INTERFACES DE REDE', allItems.interfaces, itemsConfig.interfaces);
-            content += generateSection('2', 'DESEMPENHO', allItems.desempenho, itemsConfig.desempenho);
-            content += generateSection('3', 'FUNCIONALIDADES DE CAMADA 2', allItems.camada2, itemsConfig.camada2);
-            content += generateSection('4', 'SEGURANCA', allItems.seguranca, itemsConfig.seguranca);
-            content += generateSection('5', 'GERENCIAMENTO', allItems.gerenciamento, itemsConfig.gerenciamento);
-            content += generateSection('6', 'CARACTERISTICAS FISICAS E ALIMENTACAO', allItems.fisico, itemsConfig.fisico);
-            content += generateSection('7', 'GARANTIA E SUPORTE', allItems.garantia, itemsConfig.garantia);
-            
-            content += '<h2>8 OBSERVACOES</h2>';
+            content += '<h2>' + sectionNum + ' OBSERVACOES</h2>';
             content += '<p>A presente especificacao tecnica foi elaborada de forma generica, sem direcionamento a fabricante ou modelo especifico, em conformidade com o principio da competitividade estabelecido na Lei numero 14.133, de 1 de abril de 2021 (Nova Lei de Licitacoes e Contratos Administrativos).</p>';
             content += '<p>Recomenda-se que o orgao licitante verifique se as especificacoes apresentadas atendem plenamente as necessidades da instituicao, bem como se estao em conformidade com as normas tecnicas aplicaveis e a legislacao vigente.</p>';
             content += '</body></html>';
             
             const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
-            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'especificacao_tecnica.doc'; link.click();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'especificacao_' + selectedCategory + '.doc';
+            link.click();
             showToast('Word exportado!', 'success');
-        }
-
-        viewRawBtn.addEventListener('click', () => { if (generatedSpec) { rawText.textContent = generatedSpec.plainText; rawModal.classList.add('visible'); } });
-        modalClose.addEventListener('click', () => rawModal.classList.remove('visible'));
-        rawModal.addEventListener('click', (e) => { if (e.target === rawModal) rawModal.classList.remove('visible'); });
-
-        function showToast(message, type = 'success') { toastMessage.textContent = message; toast.className = 'toast ' + type + ' visible'; setTimeout(() => toast.classList.remove('visible'), 3000); }
-
-        function generateSpecification(content, category) {
-            const title = getCategoryTitle(category);
-            const portInfo = analyzePortsFromRaw(content);
-            const perfInfo = analyzePerformanceFromRaw(content);
-            let html = '', plainText = title + '\n' + '='.repeat(title.length) + '\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">' + title + '</div></div>';
-            html += '<div class="spec-section"><div class="spec-section-title">INTERFACES DE REDE</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            plainText += '1. INTERFACES DE REDE\n------------------------------\n';
-            if (portInfo.gigabitPorts) { html += '<tr><td>Portas Gigabit</td><td>Mínimo ' + portInfo.gigabitPorts + ' portas RJ-45</td></tr>'; plainText += '• Portas Gigabit: Mínimo ' + portInfo.gigabitPorts + '\n'; }
-            if (portInfo.sfpPorts) { html += '<tr><td>Portas SFP/SFP+</td><td>Mínimo ' + portInfo.sfpPorts + ' portas</td></tr>'; plainText += '• Portas SFP: Mínimo ' + portInfo.sfpPorts + '\n'; }
-            if (portInfo.poe) { html += '<tr><td>PoE</td><td>IEEE 802.3af/at</td></tr>'; plainText += '• PoE: IEEE 802.3af/at\n'; if (portInfo.poeBudget) { html += '<tr><td>Orçamento PoE</td><td>Mínimo ' + portInfo.poeBudget + 'W</td></tr>'; plainText += '• Orçamento PoE: ' + portInfo.poeBudget + 'W\n'; } }
-            html += '<tr><td>Auto-negociação</td><td>Velocidade e duplex</td></tr></table></div>';
-            plainText += '• Auto-negociação\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">DESEMPENHO</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação Mínima</th></tr>';
-            plainText += '2. DESEMPENHO\n------------------------------\n';
-            html += '<tr><td>Switching</td><td>' + (perfInfo.switchingCapacity ? 'Mínimo ' + perfInfo.switchingCapacity : 'Wire-speed') + '</td></tr>';
-            plainText += '• Switching: ' + (perfInfo.switchingCapacity || 'Wire-speed') + '\n';
-            if (perfInfo.forwardingRate) { html += '<tr><td>Encaminhamento</td><td>Mínimo ' + perfInfo.forwardingRate + '</td></tr>'; plainText += '• Encaminhamento: ' + perfInfo.forwardingRate + '\n'; }
-            html += '<tr><td>Tabela MAC</td><td>Mínimo ' + (perfInfo.macTable || '16.000') + ' entradas</td></tr>';
-            html += '<tr><td>Latência</td><td>< 5 µs</td></tr></table></div>';
-            plainText += '• Tabela MAC: ' + (perfInfo.macTable || '16.000') + '\n• Latência: < 5 µs\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">CAMADA 2</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
-            html += '<tr><td>VLANs</td><td>IEEE 802.1Q</td></tr><tr><td>STP</td><td>STP/RSTP/MSTP</td></tr><tr><td>LACP</td><td>IEEE 802.3ad</td></tr><tr><td>QoS</td><td>IEEE 802.1p</td></tr><tr><td>IGMP</td><td>v1/v2/v3</td></tr><tr><td>LLDP</td><td>IEEE 802.1AB</td></tr><tr><td>Jumbo</td><td>9.216 bytes</td></tr></table></div>';
-            plainText += '3. CAMADA 2\n------------------------------\n• VLANs: IEEE 802.1Q\n• STP/RSTP/MSTP\n• LACP: IEEE 802.3ad\n• QoS: IEEE 802.1p\n• IGMP Snooping\n• LLDP\n• Jumbo Frames\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">SEGURANÇA</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
-            html += '<tr><td>802.1X</td><td>Com RADIUS</td></tr><tr><td>ACLs</td><td>L2/L3/L4</td></tr><tr><td>Port Security</td><td>Limitação MACs</td></tr><tr><td>DHCP Snooping</td><td>Proteção</td></tr><tr><td>DAI</td><td>ARP Inspection</td></tr><tr><td>Storm Control</td><td>Proteção</td></tr></table></div>';
-            plainText += '4. SEGURANÇA\n------------------------------\n• 802.1X com RADIUS\n• ACLs L2/L3/L4\n• Port Security\n• DHCP Snooping\n• DAI\n• Storm Control\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">GERENCIAMENTO</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
-            html += '<tr><td>CLI</td><td>Console + SSH v2</td></tr><tr><td>Web</td><td>HTTPS</td></tr><tr><td>SNMP</td><td>v1/v2c/v3</td></tr><tr><td>Syslog</td><td>Externo</td></tr><tr><td>NTP</td><td>Sincronização</td></tr><tr><td>Backup</td><td>TFTP/SFTP</td></tr></table></div>';
-            plainText += '5. GERENCIAMENTO\n------------------------------\n• CLI: Console + SSH v2\n• Web: HTTPS\n• SNMP v1/v2c/v3\n• Syslog\n• NTP\n• Backup TFTP/SFTP\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">FÍSICO</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
-            html += '<tr><td>Formato</td><td>Rack 19"</td></tr><tr><td>Alimentação</td><td>100-240VAC</td></tr><tr><td>Temperatura</td><td>0-45°C</td></tr><tr><td>Umidade</td><td>10-90%</td></tr><tr><td>Certificações</td><td>Anatel/CE/FCC</td></tr></table></div>';
-            plainText += '6. FÍSICO\n------------------------------\n• Rack 19"\n• 100-240VAC\n• 0-45°C\n• 10-90% umidade\n• Anatel/CE/FCC\n\n';
-            
-            html += '<div class="spec-section"><div class="spec-section-title">GARANTIA</div><table class="spec-table"><tr><th>Requisito</th><th>Especificação</th></tr>';
-            html += '<tr><td>Garantia</td><td>36 meses</td></tr><tr><td>Suporte</td><td>Português</td></tr><tr><td>Firmware</td><td>Atualizações</td></tr><tr><td>Manual</td><td>PT ou EN</td></tr></table></div>';
-            plainText += '7. GARANTIA\n------------------------------\n• 36 meses\n• Suporte PT\n• Firmware gratuito\n• Manual PT/EN\n\n';
-            
-            html += '<div class="spec-notes"><div class="spec-notes-title">Observações para o Edital</div><div class="spec-notes-text">Especificação genérica conforme Lei 14.133/2021.</div></div>';
-            plainText += 'OBSERVAÇÕES: Especificação genérica conforme Lei 14.133/2021.';
-            
-            return { html, plainText };
-        }
-
-        function getCategoryTitle(cat) {
-            const t = { 'switch': 'SWITCH DE REDE GERENCIÁVEL', 'router': 'ROTEADOR DE REDE', 'firewall': 'FIREWALL/UTM', 'access-point': 'PONTO DE ACESSO WIRELESS', 'server': 'SERVIDOR', 'storage': 'STORAGE', 'ups': 'NOBREAK/UPS', 'camera': 'CÂMERA IP', 'other': 'EQUIPAMENTO DE TI' };
-            return t[cat] || t.other;
-        }
-
-        function analyzePortsFromRaw(raw) {
-            const r = { gigabitPorts: null, sfpPorts: null, sfpSpeed: null, poe: false, poeBudget: null };
-            const l = raw.toLowerCase();
-            let m = l.match(/(\d+)\s*[x×]?\s*(?:port|porta)?\s*(?:10\/100\/1000|1g|gigabit|gbe)/i) || l.match(/(\d+)\s*[x×]\s*(?:rj-?45)/i);
-            if (m) r.gigabitPorts = parseInt(m[1]);
-            m = l.match(/(\d+)\s*[x×]?\s*(?:port|porta)?\s*(?:sfp\+?|10g)/i);
-            if (m) r.sfpPorts = parseInt(m[1]);
-            if (l.includes('10g') || l.includes('sfp+')) r.sfpSpeed = '10 Gbps';
-            r.poe = l.includes('poe') || l.includes('802.3af') || l.includes('802.3at');
-            m = l.match(/(\d+)\s*w(?:atts?)?\s*(?:poe|budget)/i) || l.match(/poe\s*(?:budget|power)?\s*:?\s*(\d+)\s*w/i);
-            if (m) r.poeBudget = parseInt(m[1]);
-            return r;
-        }
-
-        function analyzePerformanceFromRaw(raw) {
-            const r = { switchingCapacity: null, forwardingRate: null, macTable: null };
-            const l = raw.toLowerCase();
-            let m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:gbps|gb\/s)\s*(?:switching|capacity)/i) || l.match(/(?:switching|backplane)\s*(?:capacity)?\s*:?\s*(\d+(?:[.,]\d+)?)\s*(?:gbps)/i);
-            if (m) r.switchingCapacity = m[1].replace(',', '.') + ' Gbps';
-            m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:mpps)/i);
-            if (m) r.forwardingRate = m[1].replace(',', '.') + ' Mpps';
-            m = l.match(/(?:mac\s*(?:table|address))\s*:?\s*(\d+(?:[.,]\d+)?)\s*(k|mil)?/i) || l.match(/(\d+(?:[.,]\d+)?)\s*(k)?\s*(?:mac|endereços)/i);
-            if (m) { let v = parseFloat(m[1].replace(',', '.')); if (m[2] && m[2].toLowerCase() === 'k') v *= 1000; r.macTable = Math.round(v).toLocaleString('pt-BR'); }
-            return r;
         }
     </script>
 </body>
