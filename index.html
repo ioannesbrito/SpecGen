@@ -103,6 +103,15 @@
         .modal-close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
         .modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
         .modal-body pre { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+        .model-option { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s ease; }
+        .model-option:hover { border-color: var(--accent-primary); }
+        .model-option.selected { border-color: var(--accent-primary); background: var(--bg-tertiary); }
+        .model-option input[type="radio"] { margin-top: 0.2rem; accent-color: var(--accent-primary); }
+        .model-option-content { flex: 1; }
+        .model-option-name { font-weight: 600; color: var(--text-primary); font-size: 0.875rem; margin-bottom: 0.25rem; }
+        .model-option-desc { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.7rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem; font-weight: 500; font-family: 'Inter', sans-serif; transition: all 0.2s ease; }
+        .btn-secondary:hover { border-color: var(--accent-primary); }
         .items-config { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
         .item-config-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; }
         .item-config-label { font-size: 0.75rem; color: var(--text-secondary); }
@@ -215,6 +224,22 @@
                 <button class="modal-close" id="modalClose">✕</button>
             </div>
             <div class="modal-body"><pre id="rawText"></pre></div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="modelModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Múltiplos Modelos Detectados</div>
+                <button class="modal-close" id="modelModalClose">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--text-secondary);">Este datasheet contém especificações de múltiplos modelos. Escolha como prosseguir:</p>
+                <div id="modelList"></div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                    <button class="btn-primary" id="confirmModelBtn" style="flex: 1;">Gerar Especificação</button>
+                    <button class="btn-secondary" id="generateAllBtn" style="flex: 1;">Gerar Comparativo</button>
+                </div>
+            </div>
         </div>
     </div>
     <script>
@@ -1250,21 +1275,163 @@
             } else if (file.type === 'text/plain') { datasheetText.value = await file.text(); showToast('Arquivo carregado!', 'success'); }
         }
 
+        // ============================================================
+        // DETECCAO DE MULTIPLOS MODELOS NO DATASHEET
+        // ============================================================
+        let detectedModels = [];
+        let selectedModels = [];
+        
+        function detectModels(text) {
+            const models = [];
+            const seen = new Set();
+            
+            // Padroes comuns de SKU/modelo em datasheets
+            // Cobre: AP5050U, AP5050D, FortiGate-40F, FG-40F, X440-48p, 
+            //        EX2300-24P, CloudEngine S5731, etc.
+            const patterns = [
+                // Modelos com prefixo de letras + numero + sufixo (AP5050U, EX2300, S5731)
+                /\b([A-Z]{1,4}[-_]?\d{3,5}[A-Z0-9\-]{0,8})\b/g,
+                // FortiGate / FortiSwitch / similar - com hifen
+                /\b(Forti[A-Z][a-z]+[-\s]?\d{2,4}[A-Z]{0,4})\b/g,
+                // SKU com WW, EU, US no final (AP5050U-WW)
+                /\b([A-Z]{2,4}\d{3,5}[A-Z]?-(?:WW|US|EU|FCC|ROW))\b/g,
+                // Models como X440-G2-48p-10GE4
+                /\b([A-Z]\d{3,4}[-][A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*)\b/g
+            ];
+            
+            patterns.forEach(pattern => {
+                let match;
+                while ((match = pattern.exec(text)) !== null) {
+                    const sku = match[1].toUpperCase();
+                    // Filtros: ignora valores muito comuns
+                    if (sku.length < 5 || sku.length > 25) continue;
+                    if (/^(IEEE|HTTP|HTTPS|RFC|ISO|ABNT|IEC|UL|FCC|CE|NBR|IPV4|IPV6|IPSEC|VLAN|TLSV|SHA|MD5|AES|TLS|TCP|UDP|SNMP|HTTPS|LACP|MSTP|RSTP)/.test(sku)) continue;
+                    if (/^\d/.test(sku)) continue; // Comeca com numero
+                    if (seen.has(sku)) continue;
+                    seen.add(sku);
+                    
+                    // Tenta extrair uma descricao curta proxima ao SKU
+                    const idx = text.toUpperCase().indexOf(sku);
+                    let description = '';
+                    if (idx >= 0) {
+                        // Pega 150 caracteres apos o SKU
+                        const after = text.substring(idx + sku.length, idx + sku.length + 200).trim();
+                        const firstSentence = after.split(/[.\n]/)[0].trim();
+                        if (firstSentence.length > 10 && firstSentence.length < 180) {
+                            description = firstSentence;
+                        }
+                    }
+                    
+                    models.push({ sku: sku, description: description });
+                }
+            });
+            
+            // Limita a 8 modelos mais relevantes (que aparecem mais vezes)
+            const counts = {};
+            models.forEach(m => {
+                const cnt = (text.match(new RegExp('\\b' + m.sku + '\\b', 'gi')) || []).length;
+                counts[m.sku] = cnt;
+            });
+            
+            models.sort((a, b) => counts[b.sku] - counts[a.sku]);
+            return models.slice(0, 8).filter(m => counts[m.sku] >= 2); // So aparece se menciona >= 2x
+        }
+        
+        function showModelSelector(models) {
+            const modelList = document.getElementById('modelList');
+            modelList.innerHTML = '';
+            
+            models.forEach((model, idx) => {
+                const div = document.createElement('div');
+                div.className = 'model-option' + (idx === 0 ? ' selected' : '');
+                div.innerHTML = '<input type="radio" name="modelChoice" value="' + idx + '"' + (idx === 0 ? ' checked' : '') + '>' +
+                    '<div class="model-option-content">' +
+                    '<div class="model-option-name">' + model.sku + '</div>' +
+                    (model.description ? '<div class="model-option-desc">' + model.description + '</div>' : '') +
+                    '</div>';
+                
+                div.addEventListener('click', () => {
+                    document.querySelectorAll('.model-option').forEach(el => el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    div.querySelector('input[type="radio"]').checked = true;
+                });
+                
+                modelList.appendChild(div);
+            });
+            
+            document.getElementById('modelModal').classList.add('visible');
+        }
+        
+        function filterTextByModel(fullText, modelSku) {
+            // Tenta isolar trechos relevantes ao modelo escolhido
+            // Estrategia: mantem o texto completo mas adiciona prefixo de contexto
+            // O texto completo ainda eh util porque tem specs compartilhadas
+            return '[MODELO ESCOLHIDO: ' + modelSku + ']\n\n' + fullText;
+        }
+
         generateBtn.addEventListener('click', () => {
             const text = datasheetText.value.trim();
             if (!text) { showToast('Insira o conteudo do datasheet.', 'error'); return; }
+            
+            // Detecta multiplos modelos
+            detectedModels = detectModels(text);
+            
+            if (detectedModels.length >= 2) {
+                // Mostra seletor de modelo
+                showModelSelector(detectedModels);
+                return;
+            }
+            
+            // Geracao normal (modelo unico)
+            executeGeneration(text, selectedCategory);
+        });
+        
+        function executeGeneration(text, category, modelSku) {
             generateBtn.innerHTML = '<span class="spinner"></span>Processando...';
             generateBtn.disabled = true;
             setTimeout(() => {
-                generatedSpec = generateSpecification(text, selectedCategory);
+                const textToUse = modelSku ? filterTextByModel(text, modelSku) : text;
+                generatedSpec = generateSpecification(textToUse, category, modelSku);
                 specificationOutput.innerHTML = generatedSpec.html;
                 outputEmpty.style.display = 'none';
                 outputContent.classList.add('visible');
-                outputStatus.textContent = 'Gerado em ' + new Date().toLocaleTimeString('pt-BR');
+                outputStatus.textContent = 'Gerado em ' + new Date().toLocaleTimeString('pt-BR') + (modelSku ? ' - ' + modelSku : '');
                 generateBtn.innerHTML = 'Gerar Especificacao Tecnica';
                 generateBtn.disabled = false;
-                showToast('Especificacao gerada!', 'success');
+                showToast('Especificacao gerada!' + (modelSku ? ' (' + modelSku + ')' : ''), 'success');
             }, 800);
+        }
+        
+        function executeComparativeGeneration(text, category, models) {
+            generateBtn.innerHTML = '<span class="spinner"></span>Processando comparativo...';
+            generateBtn.disabled = true;
+            setTimeout(() => {
+                generatedSpec = generateComparativeSpec(text, category, models);
+                specificationOutput.innerHTML = generatedSpec.html;
+                outputEmpty.style.display = 'none';
+                outputContent.classList.add('visible');
+                outputStatus.textContent = 'Comparativo gerado em ' + new Date().toLocaleTimeString('pt-BR');
+                generateBtn.innerHTML = 'Gerar Especificacao Tecnica';
+                generateBtn.disabled = false;
+                showToast('Comparativo gerado com ' + models.length + ' modelos!', 'success');
+            }, 800);
+        }
+        
+        document.getElementById('modelModalClose').addEventListener('click', () => {
+            document.getElementById('modelModal').classList.remove('visible');
+        });
+        
+        document.getElementById('confirmModelBtn').addEventListener('click', () => {
+            const checked = document.querySelector('input[name="modelChoice"]:checked');
+            if (!checked) { showToast('Selecione um modelo.', 'error'); return; }
+            const model = detectedModels[parseInt(checked.value)];
+            document.getElementById('modelModal').classList.remove('visible');
+            executeGeneration(datasheetText.value, selectedCategory, model.sku);
+        });
+        
+        document.getElementById('generateAllBtn').addEventListener('click', () => {
+            document.getElementById('modelModal').classList.remove('visible');
+            executeComparativeGeneration(datasheetText.value, selectedCategory, detectedModels);
         });
 
         copyBtn.addEventListener('click', () => { if (generatedSpec) { navigator.clipboard.writeText(generatedSpec.plainText).then(() => { showToast('Texto copiado!', 'success'); }); } });
@@ -1296,13 +1463,20 @@
             return data;
         }
 
-        function generateSpecification(content, category) {
+        function generateSpecification(content, category, modelSku) {
             const template = CATEGORY_TEMPLATES[category] || CATEGORY_TEMPLATES['other'];
             const data = analyzeDatasheet(content, category);
             const title = template.title;
             
-            let html = '<div class="spec-section"><div class="spec-section-title">' + title + '</div></div>';
-            let plainText = title + '\n' + '='.repeat(title.length) + '\n\n';
+            let html = '<div class="spec-section"><div class="spec-section-title">' + title + '</div>';
+            if (modelSku) {
+                html += '<div style="padding: 0.5rem 0.75rem; background: var(--bg-tertiary); border-left: 3px solid var(--accent-primary); margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">Modelo de referencia: <strong style="color: var(--text-primary);">' + modelSku + '</strong></div>';
+            }
+            html += '</div>';
+            
+            let plainText = title + '\n' + '='.repeat(title.length) + '\n';
+            if (modelSku) plainText += 'Modelo de referencia: ' + modelSku + '\n';
+            plainText += '\n';
             
             const inputs = document.querySelectorAll('#itemsConfigContainer .item-config-input');
             const itemsCount = {};
@@ -1330,10 +1504,65 @@
                 sectionNum++;
             });
             
-            html += '<div class="spec-notes"><div class="spec-notes-title">Observacoes para o Edital</div><div class="spec-notes-text">Especificacao generica conforme Lei 14.133/2021, sem direcionamento a fabricante especifico.</div></div>';
+            html += '<div class="spec-notes"><div class="spec-notes-title">Observacoes para o Edital</div><div class="spec-notes-text">Especificacao generica conforme Lei 14.133/2021, sem direcionamento a fabricante especifico.' + (modelSku ? ' Modelo de referencia tecnica: ' + modelSku + '.' : '') + '</div></div>';
             plainText += 'OBSERVACOES: Especificacao generica conforme Lei 14.133/2021.';
+            if (modelSku) plainText += ' Modelo de referencia tecnica: ' + modelSku + '.';
             
-            return { html: html, plainText: plainText };
+            return { html: html, plainText: plainText, modelSku: modelSku };
+        }
+        
+        function generateComparativeSpec(content, category, models) {
+            const template = CATEGORY_TEMPLATES[category] || CATEGORY_TEMPLATES['other'];
+            const data = analyzeDatasheet(content, category);
+            const title = template.title;
+            
+            let html = '<div class="spec-section"><div class="spec-section-title">' + title + '</div>';
+            html += '<div style="padding: 0.5rem 0.75rem; background: var(--bg-tertiary); border-left: 3px solid var(--accent-primary); margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">Especificacao comparativa - modelos: <strong style="color: var(--text-primary);">' + models.map(m => m.sku).join(', ') + '</strong></div></div>';
+            
+            let plainText = title + '\n' + '='.repeat(title.length) + '\n';
+            plainText += 'Modelos compativeis: ' + models.map(m => m.sku).join(', ') + '\n\n';
+            
+            // Tabela comparativa dos modelos detectados
+            html += '<div class="spec-section"><div class="spec-section-title">MODELOS COMPATIVEIS</div>';
+            html += '<table class="spec-table"><tr><th>SKU</th><th>Descricao</th></tr>';
+            plainText += 'MODELOS COMPATIVEIS\n' + '-'.repeat(40) + '\n';
+            models.forEach(m => {
+                html += '<tr><td><strong>' + m.sku + '</strong></td><td>' + (m.description || '-') + '</td></tr>';
+                plainText += '- ' + m.sku + (m.description ? ': ' + m.description : '') + '\n';
+            });
+            html += '</table></div>';
+            plainText += '\n';
+            
+            const inputs = document.querySelectorAll('#itemsConfigContainer .item-config-input');
+            const itemsCount = {};
+            inputs.forEach(input => { itemsCount[input.dataset.section] = parseInt(input.value) || 5; });
+            
+            let sectionNum = 1;
+            const letters = 'abcdefghijklmnopqrstuvwxyz';
+            
+            Object.entries(template.sections).forEach(([sectionName, sectionData]) => {
+                const items = sectionData.items(data);
+                const maxItems = itemsCount[sectionName] || sectionData.default;
+                const itemsToShow = items.slice(0, maxItems);
+                
+                html += '<div class="spec-section"><div class="spec-section-title">' + sectionNum + '. ' + sectionName + '</div>';
+                html += '<table class="spec-table"><tr><th style="width:50px">Item</th><th>Especificacao</th></tr>';
+                plainText += sectionNum + '. ' + sectionName + '\n' + '-'.repeat(40) + '\n';
+                
+                itemsToShow.forEach((item, idx) => {
+                    html += '<tr><td>' + letters[idx] + ')</td><td>' + item + '</td></tr>';
+                    plainText += letters[idx] + ') ' + item + '\n';
+                });
+                
+                html += '</table></div>';
+                plainText += '\n';
+                sectionNum++;
+            });
+            
+            html += '<div class="spec-notes"><div class="spec-notes-title">Observacoes para o Edital</div><div class="spec-notes-text">Especificacao generica conforme Lei 14.133/2021, sem direcionamento a fabricante especifico. Sao aceitos modelos que atendam aos requisitos minimos especificados, incluindo as referencias tecnicas listadas.</div></div>';
+            plainText += 'OBSERVACOES: Especificacao generica conforme Lei 14.133/2021. Modelos de referencia: ' + models.map(m => m.sku).join(', ') + '.';
+            
+            return { html: html, plainText: plainText, models: models.map(m => m.sku) };
         }
 
         function getCategoryTitle(cat) {
@@ -1345,6 +1574,8 @@
             const template = CATEGORY_TEMPLATES[selectedCategory] || CATEGORY_TEMPLATES['other'];
             const data = analyzeDatasheet(datasheetText.value, selectedCategory);
             const title = template.title;
+            const modelInfo = generatedSpec && generatedSpec.modelSku ? generatedSpec.modelSku : null;
+            const modelsInfo = generatedSpec && generatedSpec.models ? generatedSpec.models : null;
             
             const inputs = document.querySelectorAll('#itemsConfigContainer .item-config-input');
             const itemsCount = {};
@@ -1353,6 +1584,12 @@
             let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>@page{margin:3cm 2cm 2cm 3cm}body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.5;text-align:justify}h1{font-size:14pt;font-weight:bold;text-align:center;text-transform:uppercase;margin-bottom:24pt}h2{font-size:12pt;font-weight:bold;margin-top:18pt;margin-bottom:12pt}p{text-indent:1.25cm;margin-bottom:12pt}ul{margin-left:1.25cm;margin-bottom:12pt;list-style-type:none}li{margin-bottom:6pt;text-align:justify}</style></head><body>';
             content += '<h1>ESPECIFICACAO TECNICA</h1>';
             content += '<h1>' + title + '</h1>';
+            
+            if (modelInfo) {
+                content += '<p><strong>Modelo de referencia tecnica:</strong> ' + modelInfo + '</p>';
+            } else if (modelsInfo) {
+                content += '<p><strong>Modelos de referencia tecnica:</strong> ' + modelsInfo.join(', ') + '</p>';
+            }
             
             const letters = 'abcdefghijklmnopqrstuvwxyz';
             let sectionNum = 1;
@@ -1372,13 +1609,17 @@
             
             content += '<h2>' + sectionNum + ' OBSERVACOES</h2>';
             content += '<p>A presente especificacao tecnica foi elaborada de forma generica, sem direcionamento a fabricante ou modelo especifico, em conformidade com o principio da competitividade estabelecido na Lei numero 14.133, de 1 de abril de 2021 (Nova Lei de Licitacoes e Contratos Administrativos).</p>';
+            if (modelInfo || modelsInfo) {
+                content += '<p>O(s) modelo(s) indicado(s) acima serve(m) apenas como referencia tecnica para o orgao licitante, sendo aceito qualquer equipamento que atenda integralmente aos requisitos minimos especificados nas secoes anteriores deste documento.</p>';
+            }
             content += '<p>Recomenda-se que o orgao licitante verifique se as especificacoes apresentadas atendem plenamente as necessidades da instituicao, bem como se estao em conformidade com as normas tecnicas aplicaveis e a legislacao vigente.</p>';
             content += '</body></html>';
             
             const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'especificacao_' + selectedCategory + '.doc';
+            const fileSuffix = modelInfo ? '_' + modelInfo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+            link.download = 'especificacao_' + selectedCategory + fileSuffix + '.doc';
             link.click();
             showToast('Word exportado!', 'success');
         }
